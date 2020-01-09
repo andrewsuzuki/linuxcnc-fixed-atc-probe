@@ -8,7 +8,34 @@ Made for the Gerber CNC wood router at Makehaven (makerspace in New Haven, CT).
 
 ## Credits
 
-- Andrew Suzuki (andrewsuzuki.com)
+- Andrew Suzuki ([andrewsuzuki.com](https://andrewsuzuki.com))
+
+## Pins
+
+- `fixed_atc_probe.number` IN FLOAT
+- `fixed_atc_probe.tool_prepare` IN BIT (looped to `prepared`)
+- `fixed_atc_probe.tool_change` IN BIT
+- `fixed_atc_probe.probe` IN BIT
+- `fixed_atc_probe.prepared` OUT BIT (looped to `tool_prepare`)
+- `fixed_atc_probe.changed` OUT BIT
+- `fixed_atc_probe.chuck` OUT BIT
+
+## Notes
+
+- All moves must avoid the tool rack. Strategy?
+- Tool loading and return can be dangerous if there is already a tool in the
+  pocket.
+- Whenever the machine will be picking up a new tool (atc tool retrieval or
+  operator tool unloading), the chuck should briefly open to drop any tool
+  already in the chuck.
+
+## TODO
+
+- Finalize fsm2
+- Configuration:
+  - Pocket locations
+  - Tool rack bounding box coordinates
+  - ...more...
 
 # States
 

@@ -1,0 +1,60 @@
+digraph atc {
+	node [shape = doublecircle]; Idle;
+	node [shape = circle];
+
+	// states
+
+    Startup
+	Idle
+    PIMovingToXY
+    PIAtXYClosed
+    PIAtXYLoadToolOpen
+    PIMovingDownwards
+    PITouching
+    PIRetracting
+    ATCMovingToSafe
+    ATCAtSafe
+    ATCReturningMovingToPocketFast
+    ATCReturningInsertingIntoPocket
+    ATCReturningAtToolOpen
+    ATCReturningRetractingOpen
+    ATCReturningRetractingClosed
+    ATCReturningMovingToSafe
+    ATCRetrievingMovingToPocketFast
+    ATCRetrievingApproachingPocketOpen
+    ATCRetrievingAtToolClosed
+    ATCRetrievingRetracting
+    ATCRetrievingMovingToSafe
+
+	// transitions
+
+    Startup -> Idle [ label = "Startup Completed" ]
+
+    Idle -> PIMovingToXY [ label = "Begin loading / probing sequence" ]
+    PIMovingToXY -> PIAtXYClosed [ label = "At loading location" ]
+    PIAtXYClosed -> PIAtXYLoadToolOpen [ label = "Operator opens collet" ]
+    PIAtXYLoadToolOpen -> PIAtXYClosed [ label = "Operator closes collet" ]
+    PIAtXYClosed -> PIMovingDownwards [ label = "Operator initiates touchoff" ]
+    PIMovingDownwards -> PITouching [ label = "Tool touches probe" ]
+    PITouching -> PIRetracting [ label = "[auto] Retract" ]
+    PIRetracting -> Idle [ label = "Retract time period finishes" ]
+
+    Idle -> ATCMovingToSafe [ label = "Begin toolchange" ]
+    ATCMovingToSafe -> ATCAtSafe [ label = "" ]
+    ATCAtSafe -> Idle [ label = "Toolchange completed (ready to machine)" ]
+
+    ATCAtSafe -> ATCReturningMovingToPocketFast [ label = "Returning tool" ]
+    ATCReturningMovingToPocketFast -> ATCReturningInsertingIntoPocket [ label = "When close" ]
+    ATCReturningInsertingIntoPocket -> ATCReturningAtToolOpen [ label = "At pocket" ]
+    ATCReturningAtToolOpen -> ATCReturningRetractingOpen [ label = "" ]
+    ATCReturningRetractingOpen -> ATCReturningRetractingClosed [ label = "When a safe air chuck distance away" ]
+    ATCReturningRetractingClosed -> ATCReturningMovingToSafe [ label = "When a safe clearance distance away" ]
+    ATCReturningMovingToSafe -> ATCAtSafe [ label = "Tool returned" ]
+
+    ATCAtSafe -> ATCRetrievingMovingToPocketFast [ label = "Retrieving tool" ]
+    ATCRetrievingMovingToPocketFast -> ATCRetrievingApproachingPocketOpen [ label = "When close" ]
+    ATCRetrievingApproachingPocketOpen -> ATCRetrievingAtToolClosed [ label = "At pocket" ]
+    ATCRetrievingAtToolClosed -> ATCRetrievingRetracting [ label = "" ]
+    ATCRetrievingRetracting -> ATCRetrievingMovingToSafe [ label = "" ]
+    ATCRetrievingMovingToSafe -> ATCAtSafe [ label = "Tool retrieved" ]
+}

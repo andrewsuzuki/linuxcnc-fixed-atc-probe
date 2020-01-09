@@ -1,0 +1,44 @@
+digraph atc {
+	node [shape = doublecircle]; Idle;
+	node [shape = circle];
+
+	// transitions
+
+    Startup -> Idle [ label = "EventMdiReady" ]
+
+    Idle -> PIMovingToLoadingXY [ label = "EventRequestLoadTool" ]
+    PIMovingToLoadingXY -> PIAtLoadingXYClosed [ label = "EventInPosition" ]
+    PIAtLoadingXYClosed -> PIAtLoadingXYOpen [ label = "EventRequestOpenCollet" ]
+    PIAtLoadingXYOpen -> PIAtLoadingXYClosed [ label = "EventRequestCloseCollet" ]
+    PIAtLoadingXYClosed -> PIMovingDownwards [ label = "EventRequestContinue" ]
+    PIMovingDownwards -> PIRetracting [ label = "EventTouchoffTouching" ]
+    PIRetracting -> Idle [ label = "EventInPosition" ]
+
+    Idle -> UnloadMovingToLoadingXY [ label = "EventRequestUnloadTool" ]
+    UnloadMovingToLoadingXY -> UnloadAtLoadingXYClosed [ label = "EventInPosition" ]
+    UnloadAtLoadingXYClosed -> UnloadAtLoadingXYOpen [ label = "EventRequestOpenCollet" ]
+    UnloadAtLoadingXYOpen -> UnloadAtLoadingXYClosed [ label = "EventRequestCloseCollet" ]
+    UnloadAtLoadingXYClosed  -> UnloadAtLoadingXYDropCheckOpen [ label = "EventRequestContinue" ]
+    UnloadAtLoadingXYDropCheckOpen -> UnloadAtLoadingXYDropCheckClosed [ label = "EventDropCheckComplete" ]
+    UnloadAtLoadingXYDropCheckClosed -> Idle [ label = "EventUnloadCompleted" ] # internal
+
+    Idle -> ATCMovingToSafe [ label = "EventRequestToolChange" ]
+    ATCMovingToSafe -> ATCAtSafe [ label = "EventInPosition" ]
+    ATCAtSafe -> Idle [ label = "EventChangeCompleted" ] # internal
+
+    ATCAtSafe -> ATCReturningMovingToPocketFast [ label = "EventIsReturning" ] # internal
+    ATCReturningMovingToPocketFast -> ATCReturningInsertingIntoPocket [ label = "EventInPosition" ]
+    ATCReturningInsertingIntoPocket -> ATCReturningAtToolOpen [ label = "EventInPosition" ]
+    ATCReturningAtToolOpen -> ATCReturningRetractingOpen [ label = "EventInPosition" ]
+    ATCReturningRetractingOpen -> ATCReturningRetractingClosed [ label = "EventInPosition" ]
+    ATCReturningRetractingClosed -> ATCReturningMovingToSafe [ label = "EventInPosition" ]
+    ATCReturningMovingToSafe -> ATCAtSafe [ label = "EventInPosition" ]
+
+    ATCAtSafe -> ATCRetrievingDropCheckOpen [ label = "EventIsRetrieving" ] # internal
+    ATCRetrievingDropCheckOpen -> ATCRetrievingMovingToPocketFast [ label = "EventDropCheckComplete" ]
+    ATCRetrievingMovingToPocketFast -> ATCRetrievingApproachingPocketOpen [ label = "EventInPosition" ]
+    ATCRetrievingApproachingPocketOpen -> ATCRetrievingAtToolClosed [ label = "EventInPosition" ]
+    ATCRetrievingAtToolClosed -> ATCRetrievingRetracting [ label = "EventPocketTimerComplete" ]
+    ATCRetrievingRetracting -> ATCRetrievingMovingToSafe [ label = "EventInPosition" ]
+    ATCRetrievingMovingToSafe -> ATCAtSafe [ label = "EventInPosition" ]
+}
