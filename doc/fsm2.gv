@@ -12,7 +12,7 @@ digraph atc {
     PIAtLoadingXYOpen -> PIAtLoadingXYClosed [ label = "EventRequestCloseCollet" ]
     PIAtLoadingXYClosed -> PIMovingDownwards [ label = "EventRequestContinue" ]
     PIMovingDownwards -> PIRetracting [ label = "EventTouchoffTouching" ]
-    PIRetracting -> Idle [ label = "EventInPosition" ]
+    PIRetracting -> ATCMovingToSafe [ label = "EventInPosition" ]
 
     Idle -> UnloadMovingToLoadingXY [ label = "EventRequestUnloadTool" ]
     UnloadMovingToLoadingXY -> UnloadAtLoadingXYClosed [ label = "EventInPosition" ]

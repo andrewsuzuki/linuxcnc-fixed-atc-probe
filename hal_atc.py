@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import PySimpleGUI as sg
+import json
 import sys
 import linuxcnc
 import hal
@@ -55,8 +56,49 @@ EventIsRetrieving = "EventIsRetrieving"
 
 def panic():
     """Panic by logging fatal error and exiting"""
-    print("fixed_atc_probe encountered a fatal error. Stopping.")
+    print "fixed_atc_probe encountered a fatal error. Stopping."
     sys.exit(1)
+
+# Config
+config = None
+with open('config.json') as config_file:
+    config = json.load(config_file)
+
+def merge_coords(coords):
+    """Merge and validate coordinate dicts from config"""
+    base = {}
+    for coord in coords:
+        base.update(coord)
+    # Validate
+    if not (getattr(base, 'x', None) and getattr(base, 'y', None) and getattr(base, 'z', None)):
+        raise AttributeError
+    return base
+
+def add_coords(a_coord, b_coord):
+    """Perform a + b on coordinates, where a is fully-formed"""
+    return {
+        "x": a_coord.x + getattr(b_coord, 'x', 0),
+        "y": a_coord.y + getattr(b_coord, 'y', 0),
+        "z": a_coord.z + getattr(b_coord, 'z', 0)
+    }
+
+def get_pocket_coord(number, coord_type):
+    """Get {x,y,z} coordinate tuple for a given pocket and coordinate type"""
+    pocket = config.pockets[str(number)]
+    if not pocket:
+        raise ValueError
+
+    base = merge_coords([config.pocket_default, pocket])
+
+    if coord_type == 'pocket':
+        return base
+    if coord_type == 'side':
+        return add_coords(base, config.pocket_side_offset)
+    if coord_type == 'above-collet':
+        return add_coords(base, {'z': config.pocket_above_collet_offset_z})
+    if coord_type == 'above-clearance':
+        return add_coords(base, {'z': config.pocket_above_clearance_offset_z})
+    raise ValueError
 
 class StateMachine(object):
     """Finite state machine for ATC and probe"""
@@ -65,50 +107,45 @@ class StateMachine(object):
         State(name=StateStartup, on_enter=None, on_exit=None),
         State(name=StateIdle, on_enter=None, on_exit=None),
 
-        # TODO on enter: move to LoadingXY[Z]
-        State(name=StatePIMovingToLoadingXY, on_enter=None, on_exit=None),
+        State(name=StatePIMovingToLoadingXY, on_enter=['move_pi_loading'], on_exit=None),
         State(name=StatePIAtLoadingXYClosed, on_enter=None, on_exit=None),
         State(name=StatePIAtLoadingXYOpen, on_enter=['open_collet'], on_exit=['close_collet']),
-        # TODO on enter: move towards touchoff target
-        State(name=StatePIMovingDownwards, on_enter=None, on_exit=None),
-        # TODO on enter: move up [by the retract amount]
-        State(name=StatePIRetracting, on_enter=None, on_exit=None),
+        State(name=StatePIMovingDownwards, on_enter=['move_pi_touchoff'], on_exit=None),
+        State(name=StatePIRetracting, on_enter=['move_pi_retract'], on_exit=None),
 
-        # TODO on enter: move to LoadingXY[Z]
-        State(name=StateUnloadMovingToLoadingXY, on_enter=None, on_exit=None),
+        State(name=StateUnloadMovingToLoadingXY, on_enter=['move_pi_loading'], on_exit=None),
         State(name=StateUnloadAtLoadingXYClosed, on_enter=None, on_exit=None),
         State(name=StateUnloadAtLoadingXYOpen, on_enter=['open_collet'], on_exit=['close_collet']),
         State(name=StateUnloadAtLoadingXYDropCheckOpen, on_enter=['open_collet'], on_exit=['close_collet']),
         # TODO on enter: dispatch EventDropCheckComplete
         State(name=StateUnloadAtLoadingXYDropCheckClosed, on_enter=None, on_exit=None),
 
-        # TODO on enter: move to safe
-        State(name=StateATCMovingToSafe, on_enter=None, on_exit=None),
+        State(name=StateATCMovingToSafe, on_enter=['move_atc_safe'], on_exit=None),
         # TODO on enter: dispatch one of three events (EventIsReturning, EventIsReceiving, EventChangeCompleted) depending on state
         State(name=StateATCAtSafe, on_enter=None, on_exit=None),
 
-        # TODO on enter: move to side of pocket
+        # TODO on enter: move to pocket side
         State(name=StateATCReturningMovingToPocketFast, on_enter=None, on_exit=None),
         # TODO on enter: move to pocket
         State(name=StateATCReturningInsertingIntoPocket, on_enter=None, on_exit=None),
         # TODO on enter: start ~0.5s timer that will dispatch EventPocketTimerComplete (though it will continue to be open)
         State(name=StateATCReturningAtToolOpen, on_enter=['open_collet'], on_exit=None),
-        # TODO on enter: move upwards
+        # TODO on enter: move to pocket collet location
         State(name=StateATCReturningRetractingOpen, on_enter=None, on_exit=['close_collet']),
-        # TODO on enter: move upwards more
+        # TODO on enter: move to pocket clearance location
         State(name=StateATCReturningRetractingClosed, on_enter=None, on_exit=None),
         # TODO on enter: move to safe
         State(name=StateATCReturningMovingToSafe, on_enter=None, on_exit=None),
 
         # TODO on enter: start timer that will dispatch EventDropCheckComplete
         State(name=StateATCRetrievingDropCheckOpen, on_enter=['open_collet'], on_exit=['close_collet']),
-        # TODO on enter: move to location far above pocket
+        # TODO on enter: move to pocket clearance location
         State(name=StateATCRetrievingMovingToPocketFast, on_enter=None, on_exit=None),
-        # TODO on enter: move downwards
+        # TODO on enter: move to pocket collet location
         State(name=StateATCRetrievingApproachingPocketOpen, on_enter=['open_collet'], on_exit=['close_collet']),
         # TODO on enter: start ~0.5s timer that will dispatch EventPocketTimerComplete
         State(name=StateATCRetrievingAtToolClosed, on_enter=None, on_exit=None),
-        # TODO on enter: move sidewards out of pocket
+        # TODO on enter: move to pocket side
         State(name=StateATCRetrievingRetracting, on_enter=None, on_exit=None),
         # TODO on enter: move to safe
         State(name=StateATCRetrievingMovingToSafe, on_enter=None, on_exit=None),
@@ -142,7 +179,7 @@ class StateMachine(object):
         # The tool begins moving downwards until it touches off
         {'trigger': EventTouchoffTouching, 'source': StatePIMovingDownwards, 'dest': StatePIRetracting},
         # The tool retracts until it is in position
-        {'trigger': EventInPosition, 'source': StatePIRetracting, 'dest': StateIdle},
+        {'trigger': EventInPosition, 'source': StatePIRetracting, 'dest': StateATCMovingToSafe},
 
         # Unload
         {'trigger': EventRequestUnloadTool, 'source': StateIdle, 'dest': StateUnloadMovingToLoadingXY},
@@ -207,7 +244,7 @@ class StateMachine(object):
             if self.is_changing_tool:
                 self.machine.dispatch(EventRequestToolChange)
             else:
-                pass # TODO ? Could possibly dispatch a end-of-atc type of event
+                # TODO ? Could possibly dispatch a end-of-atc type of event
 
     def set_is_touching(self, is_touching):
         if is_touching != self.is_touching:
@@ -236,6 +273,49 @@ class StateMachine(object):
 
     def close_collet(self):
         self.is_chuck_open = False
+
+    def move_coord_absolute(self, coord, feed=3600, dispatch_in_position=True):
+        send_gcode("G21 G53 G0 F{} X{} Y{} Z{}".format(feed, coord.x, coord.y, coord.z))
+        if dispatch_in_position:
+            self.machine.dispatch(EventInPosition)
+
+    def move_coord_relative(self, coord, feed=3600, dispatch_in_position=True):
+        send_gcode("G21 G91 G0 F{} X{} Y{} Z{}".format(feed, coord.x, coord.y, coord.z))
+        if dispatch_in_position:
+            self.machine.dispatch(EventInPosition)
+
+    def move_pi_loading(self):
+        # TODO avoid tool rack boundary
+        self.move_coord_absolute(config.loading)
+
+    def move_pi_touchoff(self):
+        # TODO tweak feedrate
+        self.move_coord_absolute(config.probe_limit, feed=10)
+
+    def move_pi_retract(self):
+        coord = {"x": 0, "y": 0, "z": config.probe_retract_offset_z}
+        self.move_coord_relative(coord)
+
+    def move_atc_safe(self):
+        # TODO avoid tool rack boundary
+        self.move_coord_absolute(config.safe)
+
+    def move_atc_pocket_side(self):
+        coord = get_pocket_coord(self.is_changing_tool, 'side')
+        self.move_coord_absolute(coord)
+
+    def move_atc_pocket(self):
+        coord = get_pocket_coord(self.is_changing_tool, 'pocket')
+        self.move_coord_absolute(coord)
+
+    def move_atc_collet(self):
+        coord = get_pocket_coord(self.is_changing_tool, 'collet')
+        self.move_coord_absolute(coord)
+
+    def move_atc_clearance(self):
+        # TODO avoid tool rack boundary (when returning)
+        coord = get_pocket_coord(self.is_changing_tool, 'clearance')
+        self.move_coord_absolute(coord)
 
 # Configure HAL Component
 h = hal.component("fixed_atc_probe")
@@ -277,7 +357,7 @@ def status_routine(state, status):
     try:
         status.poll()
     except linuxcnc.error as ex:
-        print(ex)
+        print ex
         panic()
 
     # Read status into state
@@ -312,7 +392,7 @@ def gui_routine(state):
         try:
             i = int(values['InputLoad'])
         except ValueError:
-            print('Bad input')
+            print 'Bad input'
 
         if i is not None and i >= 0:
             state.request_load_tool(i)
@@ -320,7 +400,7 @@ def gui_routine(state):
         try:
             i = int(values['InputUnload'])
         except ValueError:
-            print('Bad input')
+            print 'Bad input'
 
         if i is not None and i >= 0:
             state.request_unload_tool(i)
