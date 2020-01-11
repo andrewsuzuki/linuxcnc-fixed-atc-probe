@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import PySimpleGUI as sg
+import PySimpleGUI27 as sg
 import json
 import sys
 import linuxcnc
@@ -61,7 +61,7 @@ def panic():
 
 # Config
 config = None
-with open('config.json') as config_file:
+with open('/home/mh/Downloads/linuxcnc-fixed-atc-probe/config.json') as config_file:
     config = json.load(config_file)
 
 def merge_coords(coords):
@@ -244,6 +244,7 @@ class StateMachine(object):
             if self.is_changing_tool:
                 self.machine.dispatch(EventRequestToolChange)
             else:
+                pass
                 # TODO ? Could possibly dispatch a end-of-atc type of event
 
     def set_is_touching(self, is_touching):
@@ -318,7 +319,7 @@ class StateMachine(object):
         self.move_coord_absolute(coord)
 
 # Configure HAL Component
-h = hal.component("fixed_atc_probe")
+h = hal.component("hal_atc")
 # IN:
 h.newpin("number", hal.HAL_FLOAT, hal.HAL_IN)
 h.newpin("tool_prepare", hal.HAL_BIT, hal.HAL_IN)  # looped to `prepared`
@@ -331,7 +332,8 @@ h.newpin("chuck", hal.HAL_BIT, hal.HAL_OUT)
 h.ready()
 
 # Configure GUI window
-sg.theme('SystemDefaultForReal')
+# NOTE no themes for PySimpleGui
+# sg.theme('SystemDefaultForReal')
 layout = [[sg.Text('Tool # = Pocket #')],
           [sg.Text('Load/Probe Tool #'), sg.InputText(key='InputLoad',
                                                       size=(3, 1), do_not_clear=False), sg.Button('Load')],
@@ -339,7 +341,7 @@ layout = [[sg.Text('Tool # = Pocket #')],
                                                   size=(3, 1), do_not_clear=False), sg.Button('Unload')],
           # output for stdout/stderr
           [sg.Output(size=(50, 10))]]
-window = sg.Window('Tool Changer and Probe', layout)
+window = sg.Window('Tool Changer and Probe', layout).Finalize()
 
 def send_gcode(gcode):
     """G-code sender"""
@@ -386,7 +388,7 @@ def hal_routine(state):
 def gui_routine(state):
     """GUI routing (for main loop)"""
 
-    event, values = window.read()
+    event, values = window.Read(timeout=100)
     i = None
     if event == 'Load':
         try:
