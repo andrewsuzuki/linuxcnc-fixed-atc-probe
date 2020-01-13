@@ -38,19 +38,17 @@ TODO pins
 
 ## TODO
 
-- What happens when:
-  - Operator requests unload, but there's already a tool in the spindle (and it
-    isn't the requested tool #)? Need to return it first.
-  - Operator requests load, but there's already a tool in the spindle (and it
-    isn't the requested tool #)? Need to return it first.
 - Idle enter reset
-- save/restore modal state (M70 and M72)
-- tool table updates (G43 or G20) after probing
+- Save/restore modal state (M70 and M72)
+- Tool table updates (G43 or G20) after probing
 - state.is_changed output
 - More GUI
   - "Continue" functionality
-  - chuck
 - Tweak feeds
+- Update for new state machine
+
+### Operator Loads Tool
+
 
 ## Configuration
 
@@ -85,8 +83,6 @@ See `config.json` as an example.
   coordinates (maps). Will use `pocket_default` as default x/y/z.
 
 ## Procedure
-
-### Operator Loads Tool
 
 The operator will repeat this process for every tool in the upcoming program.
 

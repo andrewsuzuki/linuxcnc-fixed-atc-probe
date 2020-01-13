@@ -280,6 +280,22 @@ class StateMachine(object):
     def close_chuck(self):
         self.is_chuck_open = False
 
+    def flush_chuck(self):
+        """Open chuck and dispatch EVENT_FLUSH_COMPLETE after config.loiter_seconds"""
+        self.open_chuck()
+        def chuck_timer_cb():
+            self.close_chuck()
+            self.machine.dispatch(EVENT_FLUSH_COMPLETE)
+        timer = threading.Timer(config.chuck_seconds, chuck_timer_cb)
+        timer.start()
+
+    def loiter_at_pocket(self):
+        """Dispatch EVENT_LOITER_COMPLETE after config.loiter_seconds"""
+        def loiter_timer_cb():
+            self.machine.dispatch(EVENT_LOITER_COMPLETE)
+        timer = threading.Timer(config.loiter_seconds, loiter_timer_cb)
+        timer.start()
+
     def move_coord_absolute(self, coord, feed=3600, dispatch_in_position=True):
         send_gcode("G21 G53 G0 F{} X{} Y{} Z{}".format(feed, coord.x, coord.y, coord.z))
         if dispatch_in_position:
