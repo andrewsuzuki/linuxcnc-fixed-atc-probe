@@ -1,60 +1,45 @@
 digraph atc {
-	node [shape = doublecircle]; Idle;
+	node [shape = doublecircle]; STATE_IDLE;
 	node [shape = circle];
 
-	// states
+	// Transitions
 
-    Startup
-	Idle
-    PIMovingToXY
-    PIAtXYClosed
-    PIAtXYLoadToolOpen
-    PIMovingDownwards
-    PITouching
-    PIRetracting
-    ATCMovingToSafe
-    ATCAtSafe
-    ATCReturningMovingToPocketFast
-    ATCReturningInsertingIntoPocket
-    ATCReturningAtToolOpen
-    ATCReturningRetractingOpen
-    ATCReturningRetractingClosed
-    ATCReturningMovingToSafe
-    ATCRetrievingMovingToPocketFast
-    ATCRetrievingApproachingPocketOpen
-    ATCRetrievingAtToolClosed
-    ATCRetrievingRetracting
-    ATCRetrievingMovingToSafe
+    STATE_WAITING -> STATE_IDLE [ label = "EVENT_READY" ]
 
-	// transitions
+    STATE_IDLE -> STATE_LOAD_MOVE_LOADING [ label = "EVENT_REQUEST_LOAD" ]
+    STATE_LOAD_MOVE_LOADING -> STATE_LOAD_AT_LOADING [ label = "EVENT_IN_POSITION" ]
+    STATE_LOAD_AT_LOADING -> STATE_LOAD_PROBE [ label = "EVENT_REQUEST_CONTINUE" ]
+    STATE_LOAD_PROBE -> STATE_LOAD_RETRACT [ label = "EVENT_PROBE_TOUCHED" ]
+    STATE_LOAD_RETRACT -> STATE_LOAD_MOVE_SAFE_INITIAL [ label = "EVENT_IN_POSITION" ]
+    STATE_LOAD_MOVE_SAFE_INITIAL -> STATE_LOAD_MOVE_CLEARANCE [ label = "EVENT_IN_POSITION" ]
+    STATE_LOAD_MOVE_CLEARANCE -> STATE_LOAD_MOVE_CLOSE [ label = "EVENT_IN_POSITION" ]
+    STATE_LOAD_MOVE_CLOSE -> STATE_LOAD_MOVE_POCKET [ label = "EVENT_IN_POSITION" ]
+    STATE_LOAD_MOVE_POCKET -> STATE_LOAD_LOITER_POCKET [ label = "EVENT_IN_POSITION" ]
+    STATE_LOAD_LOITER_POCKET -> STATE_LOAD_MOVE_SIDE [ label = "EVENT_LOITER_COMPLETE" ]
+    STATE_LOAD_MOVE_SIDE -> STATE_LOAD_MOVE_SAFE_FINAL [ label = "EVENT_IN_POSITION" ]
+    STATE_LOAD_MOVE_SAFE_FINAL -> STATE_IDLE [ label = "EVENT_IN_POSITION" ]
 
-    Startup -> Idle [ label = "Startup Completed" ]
+    STATE_IDLE -> STATE_UNLOAD_MOVE_LOADING [ label = "EVENT_REQUEST_UNLOAD" ]
+    STATE_UNLOAD_MOVE_LOADING -> STATE_UNLOAD_AT_LOADING [ label = "EVENT_IN_POSITION" ]
+    STATE_UNLOAD_AT_LOADING -> STATE_UNLOAD_MOVE_SAFE [ label = "EVENT_REQUEST_CONTINUE" ]
+    STATE_UNLOAD_MOVE_SAFE -> STATE_UNLOAD_FLUSH [ label = "EVENT_IN_POSITION" ]
+    STATE_UNLOAD_FLUSH -> STATE_IDLE [ label = "EVENT_FLUSH_COMPLETE" ]
 
-    Idle -> PIMovingToXY [ label = "Begin loading / probing sequence" ]
-    PIMovingToXY -> PIAtXYClosed [ label = "At loading location" ]
-    PIAtXYClosed -> PIAtXYLoadToolOpen [ label = "Operator opens collet" ]
-    PIAtXYLoadToolOpen -> PIAtXYClosed [ label = "Operator closes collet" ]
-    PIAtXYClosed -> PIMovingDownwards [ label = "Operator initiates touchoff" ]
-    PIMovingDownwards -> PITouching [ label = "Tool touches probe" ]
-    PITouching -> PIRetracting [ label = "[auto] Retract" ]
-    PIRetracting -> Idle [ label = "Retract time period finishes" ]
+    STATE_IDLE -> STATE_RETURN_MOVE_SAFE [ label = "EVENT_REQUEST_RETURN" ]
+    STATE_RETURN_MOVE_SAFE -> STATE_RETURN_MOVE_CLEARANCE [ label = "EVENT_IN_POSITION" ]
+    STATE_RETURN_MOVE_CLEARANCE -> STATE_RETURN_MOVE_CLOSE [ label = "EVENT_IN_POSITION" ]
+    STATE_RETURN_MOVE_CLOSE -> STATE_RETURN_MOVE_POCKET [ label = "EVENT_IN_POSITION" ]
+    STATE_RETURN_MOVE_POCKET -> STATE_RETURN_LOITER_POCKET [ label = "EVENT_IN_POSITION" ]
+    STATE_RETURN_LOITER_POCKET -> STATE_RETURN_MOVE_SIDE [ label = "EVENT_LOITER_COMPLETE" ]
+    STATE_RETURN_MOVE_SIDE -> STATE_RETRIEVE_MOVE_SAFE_INITIAL [ label = "EVENT_IN_POSITION" ]
 
-    Idle -> ATCMovingToSafe [ label = "Begin toolchange" ]
-    ATCMovingToSafe -> ATCAtSafe [ label = "" ]
-    ATCAtSafe -> Idle [ label = "Toolchange completed (ready to machine)" ]
-
-    ATCAtSafe -> ATCReturningMovingToPocketFast [ label = "Returning tool" ]
-    ATCReturningMovingToPocketFast -> ATCReturningInsertingIntoPocket [ label = "When close" ]
-    ATCReturningInsertingIntoPocket -> ATCReturningAtToolOpen [ label = "At pocket" ]
-    ATCReturningAtToolOpen -> ATCReturningRetractingOpen [ label = "" ]
-    ATCReturningRetractingOpen -> ATCReturningRetractingClosed [ label = "When a safe air chuck distance away" ]
-    ATCReturningRetractingClosed -> ATCReturningMovingToSafe [ label = "When a safe clearance distance away" ]
-    ATCReturningMovingToSafe -> ATCAtSafe [ label = "Tool returned" ]
-
-    ATCAtSafe -> ATCRetrievingMovingToPocketFast [ label = "Retrieving tool" ]
-    ATCRetrievingMovingToPocketFast -> ATCRetrievingApproachingPocketOpen [ label = "When close" ]
-    ATCRetrievingApproachingPocketOpen -> ATCRetrievingAtToolClosed [ label = "At pocket" ]
-    ATCRetrievingAtToolClosed -> ATCRetrievingRetracting [ label = "" ]
-    ATCRetrievingRetracting -> ATCRetrievingMovingToSafe [ label = "" ]
-    ATCRetrievingMovingToSafe -> ATCAtSafe [ label = "Tool retrieved" ]
+    STATE_IDLE -> STATE_RETRIEVE_MOVE_SAFE_INITIAL [ label = "EVENT_REQUEST_RETRIEVE" ]
+    STATE_RETRIEVE_MOVE_SAFE_INITIAL -> STATE_RETRIEVE_FLUSH [ label = "EVENT_IN_POSITION" ]
+    STATE_RETRIEVE_FLUSH -> STATE_RETRIEVE_MOVE_SIDE [ label = "EVENT_FLUSH_COMPLETE" ]
+    STATE_RETRIEVE_MOVE_SIDE -> STATE_RETRIEVE_MOVE_POCKET [ label = "EVENT_IN_POSITION" ]
+    STATE_RETRIEVE_MOVE_POCKET -> STATE_RETRIEVE_LOITER_POCKET [ label = "EVENT_IN_POSITION" ]
+    STATE_RETRIEVE_LOITER_POCKET -> STATE_RETRIEVE_MOVE_CLOSE [ label = "EVENT_LOITER_COMPLETE" ]
+    STATE_RETRIEVE_MOVE_CLOSE -> STATE_RETRIEVE_MOVE_CLEARANCE [ label = "EVENT_IN_POSITION" ]
+    STATE_RETRIEVE_MOVE_CLEARANCE -> STATE_RETRIEVE_MOVE_SAFE_FINAL [ label = "EVENT_IN_POSITION" ]
+    STATE_RETRIEVE_MOVE_SAFE_FINAL -> STATE_IDLE [ label = "EVENT_IN_POSITION" ]
 }

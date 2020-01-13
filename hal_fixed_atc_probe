@@ -6,6 +6,7 @@ import sys
 import linuxcnc
 import hal
 from transitions import Machine, State
+from os.path import expanduser
 
 # Constants
 
@@ -42,8 +43,8 @@ EventMdiReady = "EventMdiReady"
 EventInPosition = "EventInPosition"
 EventRequestLoadTool = "EventRequestLoadTool"
 EventRequestUnloadTool = "EventRequestUnloadTool"
-EventRequestOpenCollet = "EventRequestOpenCollet"
-EventRequestCloseCollet = "EventRequestCloseCollet"
+EventRequestOpenchuck = "EventRequestOpenchuck"
+EventRequestClosechuck = "EventRequestClosechuck"
 EventRequestContinue = "EventRequestContinue"
 EventTouchoffTouching = "EventTouchoffTouching"
 EventDropCheckComplete = "EventDropCheckComplete"
@@ -56,13 +57,17 @@ EventIsRetrieving = "EventIsRetrieving"
 
 def panic():
     """Panic by logging fatal error and exiting"""
-    print "fixed_atc_probe encountered a fatal error. Stopping."
+    print "hal_fixed_atc_probe encountered a fatal error. Stopping."
     sys.exit(1)
 
 # Config
 config = None
-with open('/home/mh/Downloads/linuxcnc-fixed-atc-probe/config.json') as config_file:
-    config = json.load(config_file)
+try:
+    with open(expanduser('~/hal_fixed_atc_probe_config.json')) as config_file:
+        config = json.load(config_file)
+except Exception as ex:
+    print "Couldn't find config file at ~/hal_fixed_atc_probe_config.json"
+    sys.exit(1)
 
 def merge_coords(coords):
     """Merge and validate coordinate dicts from config"""
@@ -94,8 +99,8 @@ def get_pocket_coord(number, coord_type):
         return base
     if coord_type == 'side':
         return add_coords(base, config.pocket_side_offset)
-    if coord_type == 'above-collet':
-        return add_coords(base, {'z': config.pocket_above_collet_offset_z})
+    if coord_type == 'above-chuck':
+        return add_coords(base, {'z': config.pocket_above_chuck_offset_z})
     if coord_type == 'above-clearance':
         return add_coords(base, {'z': config.pocket_above_clearance_offset_z})
     raise ValueError
@@ -109,14 +114,14 @@ class StateMachine(object):
 
         State(name=StatePIMovingToLoadingXY, on_enter=['move_pi_loading'], on_exit=None),
         State(name=StatePIAtLoadingXYClosed, on_enter=None, on_exit=None),
-        State(name=StatePIAtLoadingXYOpen, on_enter=['open_collet'], on_exit=['close_collet']),
+        State(name=StatePIAtLoadingXYOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
         State(name=StatePIMovingDownwards, on_enter=['move_pi_touchoff'], on_exit=None),
         State(name=StatePIRetracting, on_enter=['move_pi_retract'], on_exit=None),
 
         State(name=StateUnloadMovingToLoadingXY, on_enter=['move_pi_loading'], on_exit=None),
         State(name=StateUnloadAtLoadingXYClosed, on_enter=None, on_exit=None),
-        State(name=StateUnloadAtLoadingXYOpen, on_enter=['open_collet'], on_exit=['close_collet']),
-        State(name=StateUnloadAtLoadingXYDropCheckOpen, on_enter=['open_collet'], on_exit=['close_collet']),
+        State(name=StateUnloadAtLoadingXYOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
+        State(name=StateUnloadAtLoadingXYDropCheckOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
         # TODO on enter: dispatch EventDropCheckComplete
         State(name=StateUnloadAtLoadingXYDropCheckClosed, on_enter=None, on_exit=None),
 
@@ -129,20 +134,20 @@ class StateMachine(object):
         # TODO on enter: move to pocket
         State(name=StateATCReturningInsertingIntoPocket, on_enter=None, on_exit=None),
         # TODO on enter: start ~0.5s timer that will dispatch EventPocketTimerComplete (though it will continue to be open)
-        State(name=StateATCReturningAtToolOpen, on_enter=['open_collet'], on_exit=None),
-        # TODO on enter: move to pocket collet location
-        State(name=StateATCReturningRetractingOpen, on_enter=None, on_exit=['close_collet']),
+        State(name=StateATCReturningAtToolOpen, on_enter=['open_chuck'], on_exit=None),
+        # TODO on enter: move to pocket chuck location
+        State(name=StateATCReturningRetractingOpen, on_enter=None, on_exit=['close_chuck']),
         # TODO on enter: move to pocket clearance location
         State(name=StateATCReturningRetractingClosed, on_enter=None, on_exit=None),
         # TODO on enter: move to safe
         State(name=StateATCReturningMovingToSafe, on_enter=None, on_exit=None),
 
         # TODO on enter: start timer that will dispatch EventDropCheckComplete
-        State(name=StateATCRetrievingDropCheckOpen, on_enter=['open_collet'], on_exit=['close_collet']),
+        State(name=StateATCRetrievingDropCheckOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
         # TODO on enter: move to pocket clearance location
         State(name=StateATCRetrievingMovingToPocketFast, on_enter=None, on_exit=None),
-        # TODO on enter: move to pocket collet location
-        State(name=StateATCRetrievingApproachingPocketOpen, on_enter=['open_collet'], on_exit=['close_collet']),
+        # TODO on enter: move to pocket chuck location
+        State(name=StateATCRetrievingApproachingPocketOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
         # TODO on enter: start ~0.5s timer that will dispatch EventPocketTimerComplete
         State(name=StateATCRetrievingAtToolClosed, on_enter=None, on_exit=None),
         # TODO on enter: move to pocket side
@@ -170,10 +175,10 @@ class StateMachine(object):
         {'trigger': EventRequestLoadTool, 'source': StateIdle, 'dest': StatePIMovingToLoadingXY},
         # The machine reaches LoadingXY. Wait.
         {'trigger': EventInPosition, 'source': StatePIMovingToLoadingXY, 'dest': StatePIAtLoadingXYClosed},
-        # The operator requests opening the collet.
-        {'trigger': EventRequestOpenCollet, 'source': StatePIAtLoadingXYClosed, 'dest': StatePIAtLoadingXYOpen},
-        # The operator requests closing the collet.
-        {'trigger': EventRequestCloseCollet, 'source': StatePIAtLoadingXYOpen, 'dest': StatePIAtLoadingXYClosed},
+        # The operator requests opening the chuck.
+        {'trigger': EventRequestOpenchuck, 'source': StatePIAtLoadingXYClosed, 'dest': StatePIAtLoadingXYOpen},
+        # The operator requests closing the chuck.
+        {'trigger': EventRequestClosechuck, 'source': StatePIAtLoadingXYOpen, 'dest': StatePIAtLoadingXYClosed},
         # The operator, having loaded the tool, requests continuing the procedure.
         {'trigger': EventRequestContinue, 'source': StatePIAtLoadingXYClosed, 'dest': StatePIMovingDownwards},
         # The tool begins moving downwards until it touches off
@@ -184,8 +189,8 @@ class StateMachine(object):
         # Unload
         {'trigger': EventRequestUnloadTool, 'source': StateIdle, 'dest': StateUnloadMovingToLoadingXY},
         {'trigger': EventInPosition, 'source': StateUnloadMovingToLoadingXY, 'dest': StateUnloadAtLoadingXYClosed},
-        {'trigger': EventRequestOpenCollet, 'source': StateUnloadAtLoadingXYClosed, 'dest': StateUnloadAtLoadingXYOpen},
-        {'trigger': EventRequestCloseCollet, 'source': StateUnloadAtLoadingXYOpen, 'dest': StateUnloadAtLoadingXYClosed},
+        {'trigger': EventRequestOpenchuck, 'source': StateUnloadAtLoadingXYClosed, 'dest': StateUnloadAtLoadingXYOpen},
+        {'trigger': EventRequestClosechuck, 'source': StateUnloadAtLoadingXYOpen, 'dest': StateUnloadAtLoadingXYClosed},
         {'trigger': EventRequestContinue, 'source': StateUnloadAtLoadingXYClosed , 'dest': StateUnloadAtLoadingXYDropCheckOpen},
         {'trigger': EventDropCheckComplete, 'source': StateUnloadAtLoadingXYDropCheckOpen, 'dest': StateUnloadAtLoadingXYDropCheckClosed},
         {'trigger': EventUnloadCompleted, 'source': StateUnloadAtLoadingXYDropCheckClosed, 'dest': StateIdle}, # internal
@@ -269,10 +274,10 @@ class StateMachine(object):
                 self.machine.dispatch(EventMdiNotReady)
                 panic()
 
-    def open_collet(self):
+    def open_chuck(self):
         self.is_chuck_open = True
 
-    def close_collet(self):
+    def close_chuck(self):
         self.is_chuck_open = False
 
     def move_coord_absolute(self, coord, feed=3600, dispatch_in_position=True):
@@ -309,8 +314,8 @@ class StateMachine(object):
         coord = get_pocket_coord(self.is_changing_tool, 'pocket')
         self.move_coord_absolute(coord)
 
-    def move_atc_collet(self):
-        coord = get_pocket_coord(self.is_changing_tool, 'collet')
+    def move_atc_chuck(self):
+        coord = get_pocket_coord(self.is_changing_tool, 'chuck')
         self.move_coord_absolute(coord)
 
     def move_atc_clearance(self):
@@ -319,7 +324,7 @@ class StateMachine(object):
         self.move_coord_absolute(coord)
 
 # Configure HAL Component
-h = hal.component("hal_atc")
+h = hal.component("hal_fixed_atc_probe")
 # IN:
 h.newpin("number", hal.HAL_FLOAT, hal.HAL_IN)
 h.newpin("tool_prepare", hal.HAL_BIT, hal.HAL_IN)  # looped to `prepared`
@@ -332,8 +337,6 @@ h.newpin("chuck", hal.HAL_BIT, hal.HAL_OUT)
 h.ready()
 
 # Configure GUI window
-# NOTE no themes for PySimpleGui
-# sg.theme('SystemDefaultForReal')
 layout = [[sg.Text('Tool # = Pocket #')],
           [sg.Text('Load/Probe Tool #'), sg.InputText(key='InputLoad',
                                                       size=(3, 1), do_not_clear=False), sg.Button('Load')],
@@ -374,7 +377,7 @@ def status_routine(state, status):
     # state.set_file(status.file)
 
 def hal_routine(state):
-    """HAL Routine (for main loop)"""
+    """HAL routine (for main loop)"""
 
     # input pins
     state.set_tool_change(h.tool_change == 1, h.number, h.changed == 1)
@@ -386,9 +389,9 @@ def hal_routine(state):
     h.prepared = h.tool_prepare
 
 def gui_routine(state):
-    """GUI routing (for main loop)"""
+    """GUI routine (for main loop)"""
 
-    event, values = window.Read(timeout=100)
+    event, values = window.Read(timeout=10)
     i = None
     if event == 'Load':
         try:
@@ -406,7 +409,6 @@ def gui_routine(state):
 
         if i is not None and i >= 0:
             state.request_unload_tool(i)
-
 
 # Initialize state machine
 state = StateMachine()

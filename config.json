@@ -1,12 +1,13 @@
 {
+    "probe_length_compensation_offset": -100,
     "probe_retract_offset_z": 10,
     "pocket_side_offset": {
         "x": 0,
         "y": 50
     },
-    "pocket_above_collet_offset_z": 10,
+    "pocket_above_chuck_offset_z": 10,
     "pocket_above_clearance_offset_z": 110,
-    "collet_seconds": 0.8,
+    "chuck_seconds": 0.8,
     "loading": {
         "x": 0,
         "y": 0,
