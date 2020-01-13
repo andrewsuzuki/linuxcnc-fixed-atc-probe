@@ -10,50 +10,59 @@ from os.path import expanduser
 
 # Constants
 
-StateStartup = "StateStartup"
-StateIdle = "StateIdle"
-StatePIMovingToLoadingXY = "StatePIMovingToLoadingXY"
-StatePIAtLoadingXYClosed = "StatePIAtLoadingXYClosed"
-StatePIAtLoadingXYOpen = "StatePIAtLoadingXYOpen"
-StatePIMovingDownwards = "StatePIMovingDownwards"
-StatePIRetracting = "StatePIRetracting"
-StateUnloadMovingToLoadingXY = "StateUnloadMovingToLoadingXY"
-StateUnloadAtLoadingXYClosed = "StateUnloadAtLoadingXYClosed"
-StateUnloadAtLoadingXYOpen = "StateUnloadAtLoadingXYOpen"
-StateUnloadAtLoadingXYClosed  = "StateUnloadAtLoadingXYClosed "
-StateUnloadAtLoadingXYDropCheckOpen = "StateUnloadAtLoadingXYDropCheckOpen"
-StateUnloadAtLoadingXYDropCheckClosed = "StateUnloadAtLoadingXYDropCheckClosed"
-StateATCMovingToSafe = "StateATCMovingToSafe"
-StateATCAtSafe = "StateATCAtSafe"
-StateATCReturningMovingToPocketFast = "StateATCReturningMovingToPocketFast"
-StateATCReturningInsertingIntoPocket = "StateATCReturningInsertingIntoPocket"
-StateATCReturningAtToolOpen = "StateATCReturningAtToolOpen"
-StateATCReturningRetractingOpen = "StateATCReturningRetractingOpen"
-StateATCReturningRetractingClosed = "StateATCReturningRetractingClosed"
-StateATCReturningMovingToSafe = "StateATCReturningMovingToSafe"
-StateATCRetrievingDropCheckOpen = "StateATCRetrievingDropCheckOpen"
-StateATCRetrievingMovingToPocketFast = "StateATCRetrievingMovingToPocketFast"
-StateATCRetrievingApproachingPocketOpen = "StateATCRetrievingApproachingPocketOpen"
-StateATCRetrievingAtToolClosed = "StateATCRetrievingAtToolClosed"
-StateATCRetrievingRetracting = "StateATCRetrievingRetracting"
-StateATCRetrievingMovingToSafe = "StateATCRetrievingMovingToSafe"
+STATE_WAITING = "STATE_WAITING"
+STATE_IDLE = "STATE_IDLE"
+STATE_LOAD_INIT = "STATE_LOAD_INIT"
+STATE_LOAD_MOVE_LOADING = "STATE_LOAD_MOVE_LOADING"
+STATE_LOAD_AT_LOADING = "STATE_LOAD_AT_LOADING"
+STATE_LOAD_PROBE = "STATE_LOAD_PROBE"
+STATE_LOAD_RETRACT = "STATE_LOAD_RETRACT"
+STATE_LOAD_MOVE_SAFE_INITIAL = "STATE_LOAD_MOVE_SAFE_INITIAL"
+STATE_LOAD_MOVE_CLEARANCE = "STATE_LOAD_MOVE_CLEARANCE"
+STATE_LOAD_MOVE_CLOSE = "STATE_LOAD_MOVE_CLOSE"
+STATE_LOAD_MOVE_POCKET = "STATE_LOAD_MOVE_POCKET"
+STATE_LOAD_LOITER_POCKET = "STATE_LOAD_LOITER_POCKET"
+STATE_LOAD_MOVE_SIDE = "STATE_LOAD_MOVE_SIDE"
+STATE_LOAD_MOVE_SAFE_FINAL = "STATE_LOAD_MOVE_SAFE_FINAL"
+STATE_UNLOAD_INIT = "STATE_UNLOAD_INIT"
+STATE_UNLOAD_MOVE_LOADING = "STATE_UNLOAD_MOVE_LOADING"
+STATE_UNLOAD_AT_LOADING = "STATE_UNLOAD_AT_LOADING"
+STATE_UNLOAD_MOVE_SAFE = "STATE_UNLOAD_MOVE_SAFE"
+STATE_UNLOAD_FLUSH = "STATE_UNLOAD_FLUSH"
+STATE_ATC_INIT = "STATE_ATC_INIT"
+STATE_RETURN_MOVE_SAFE = "STATE_RETURN_MOVE_SAFE"
+STATE_RETURN_MOVE_CLEARANCE = "STATE_RETURN_MOVE_CLEARANCE"
+STATE_RETURN_MOVE_CLOSE = "STATE_RETURN_MOVE_CLOSE"
+STATE_RETURN_MOVE_POCKET = "STATE_RETURN_MOVE_POCKET"
+STATE_RETURN_LOITER_POCKET = "STATE_RETURN_LOITER_POCKET"
+STATE_RETURN_MOVE_SIDE = "STATE_RETURN_MOVE_SIDE"
+STATE_RETURN_FINAL = "STATE_RETURN_FINAL"
+STATE_RETRIEVE_MOVE_SAFE_INITIAL = "STATE_RETRIEVE_MOVE_SAFE_INITIAL"
+STATE_RETRIEVE_FLUSH = "STATE_RETRIEVE_FLUSH"
+STATE_RETRIEVE_MOVE_SIDE = "STATE_RETRIEVE_MOVE_SIDE"
+STATE_RETRIEVE_MOVE_POCKET = "STATE_RETRIEVE_MOVE_POCKET"
+STATE_RETRIEVE_LOITER_POCKET = "STATE_RETRIEVE_LOITER_POCKET"
+STATE_RETRIEVE_MOVE_CLOSE = "STATE_RETRIEVE_MOVE_CLOSE"
+STATE_RETRIEVE_MOVE_CLEARANCE = "STATE_RETRIEVE_MOVE_CLEARANCE"
+STATE_RETRIEVE_MOVE_SAFE_FINAL = "STATE_RETRIEVE_MOVE_SAFE_FINAL"
 
-EventMdiNotReady = "EventMdiNotReady"
-EventMdiReady = "EventMdiReady"
-EventInPosition = "EventInPosition"
-EventRequestLoadTool = "EventRequestLoadTool"
-EventRequestUnloadTool = "EventRequestUnloadTool"
-EventRequestOpenchuck = "EventRequestOpenchuck"
-EventRequestClosechuck = "EventRequestClosechuck"
-EventRequestContinue = "EventRequestContinue"
-EventTouchoffTouching = "EventTouchoffTouching"
-EventDropCheckComplete = "EventDropCheckComplete"
-EventUnloadCompleted = "EventUnloadCompleted"
-EventRequestToolChange = "EventRequestToolChange"
-EventPocketTimerComplete = "EventEventRetrievingPocketTimerComplete"
-EventChangeCompleted = "EventChangeCompleted"
-EventIsReturning = "EventIsReturning"
-EventIsRetrieving = "EventIsRetrieving"
+EVENT_NOT_READY= "EVENT_NOT_READY"
+EVENT_READY = "EVENT_READY"
+EVENT_REQUEST_LOAD = "EVENT_REQUEST_LOAD"
+EVENT_REQUEST_UNLOAD = "EVENT_REQUEST_UNLOAD"
+EVENT_REQUEST_ATC = "EVENT_REQUEST_ATC"
+EVENT_REQUEST_CONTINUE = "EVENT_REQUEST_CONTINUE"
+EVENT_NEEDS_RETURN = "EVENT_NEEDS_RETURN"
+EVENT_LOAD_OK = "EVENT_LOAD_OK"
+EVENT_UNLOAD_OK = "EVENT_UNLOAD_OK"
+EVENT_RETRIEVE_OK = "EVENT_RETRIEVE_OK"
+EVENT_IN_POSITION = "EVENT_IN_POSITION"
+EVENT_PROBE_TOUCHED = "EVENT_PROBE_TOUCHED"
+EVENT_LOITER_COMPLETE = "EVENT_LOITER_COMPLETE"
+EVENT_FLUSH_COMPLETE = "EVENT_FLUSH_COMPLETE"
+EVENT_CONTINUE_ATC = "EVENT_CONTINUE_ATC"
+EVENT_CONTINUE_UNLOAD = "EVENT_CONTINUE_UNLOAD"
+EVENT_CONTINUE_LOAD = "EVENT_CONTINUE_LOAD"
 
 def panic():
     """Panic by logging fatal error and exiting"""
@@ -109,55 +118,46 @@ class StateMachine(object):
     """Finite state machine for ATC and probe"""
 
     states = [
-        State(name=StateStartup, on_enter=None, on_exit=None),
-        State(name=StateIdle, on_enter=None, on_exit=None),
-
-        State(name=StatePIMovingToLoadingXY, on_enter=['move_pi_loading'], on_exit=None),
-        State(name=StatePIAtLoadingXYClosed, on_enter=None, on_exit=None),
-        State(name=StatePIAtLoadingXYOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
-        State(name=StatePIMovingDownwards, on_enter=['move_pi_touchoff'], on_exit=None),
-        State(name=StatePIRetracting, on_enter=['move_pi_retract'], on_exit=None),
-
-        State(name=StateUnloadMovingToLoadingXY, on_enter=['move_pi_loading'], on_exit=None),
-        State(name=StateUnloadAtLoadingXYClosed, on_enter=None, on_exit=None),
-        State(name=StateUnloadAtLoadingXYOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
-        State(name=StateUnloadAtLoadingXYDropCheckOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
-        # TODO on enter: dispatch EventDropCheckComplete
-        State(name=StateUnloadAtLoadingXYDropCheckClosed, on_enter=None, on_exit=None),
-
-        State(name=StateATCMovingToSafe, on_enter=['move_atc_safe'], on_exit=None),
-        # TODO on enter: dispatch one of three events (EventIsReturning, EventIsReceiving, EventChangeCompleted) depending on state
-        State(name=StateATCAtSafe, on_enter=None, on_exit=None),
-
-        # TODO on enter: move to pocket side
-        State(name=StateATCReturningMovingToPocketFast, on_enter=None, on_exit=None),
-        # TODO on enter: move to pocket
-        State(name=StateATCReturningInsertingIntoPocket, on_enter=None, on_exit=None),
-        # TODO on enter: start ~0.5s timer that will dispatch EventPocketTimerComplete (though it will continue to be open)
-        State(name=StateATCReturningAtToolOpen, on_enter=['open_chuck'], on_exit=None),
-        # TODO on enter: move to pocket chuck location
-        State(name=StateATCReturningRetractingOpen, on_enter=None, on_exit=['close_chuck']),
-        # TODO on enter: move to pocket clearance location
-        State(name=StateATCReturningRetractingClosed, on_enter=None, on_exit=None),
-        # TODO on enter: move to safe
-        State(name=StateATCReturningMovingToSafe, on_enter=None, on_exit=None),
-
-        # TODO on enter: start timer that will dispatch EventDropCheckComplete
-        State(name=StateATCRetrievingDropCheckOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
-        # TODO on enter: move to pocket clearance location
-        State(name=StateATCRetrievingMovingToPocketFast, on_enter=None, on_exit=None),
-        # TODO on enter: move to pocket chuck location
-        State(name=StateATCRetrievingApproachingPocketOpen, on_enter=['open_chuck'], on_exit=['close_chuck']),
-        # TODO on enter: start ~0.5s timer that will dispatch EventPocketTimerComplete
-        State(name=StateATCRetrievingAtToolClosed, on_enter=None, on_exit=None),
-        # TODO on enter: move to pocket side
-        State(name=StateATCRetrievingRetracting, on_enter=None, on_exit=None),
-        # TODO on enter: move to safe
-        State(name=StateATCRetrievingMovingToSafe, on_enter=None, on_exit=None),
+        State(STATE_WAITING, on_enter=None, on_exit=None),
+        State(STATE_IDLE, on_enter=None, on_exit=None),
+        State(STATE_LOAD_INIT, on_enter=None, on_exit=None),
+        State(STATE_LOAD_MOVE_LOADING, on_enter=None, on_exit=None),
+        State(STATE_LOAD_AT_LOADING, on_enter=None, on_exit=None),
+        State(STATE_LOAD_PROBE, on_enter=None, on_exit=None),
+        State(STATE_LOAD_RETRACT, on_enter=None, on_exit=None),
+        State(STATE_LOAD_MOVE_SAFE_INITIAL, on_enter=None, on_exit=None),
+        State(STATE_LOAD_MOVE_CLEARANCE, on_enter=None, on_exit=None),
+        State(STATE_LOAD_MOVE_CLOSE, on_enter=None, on_exit=None),
+        State(STATE_LOAD_MOVE_POCKET, on_enter=None, on_exit=None),
+        State(STATE_LOAD_LOITER_POCKET, on_enter=None, on_exit=None),
+        State(STATE_LOAD_MOVE_SIDE, on_enter=None, on_exit=None),
+        State(STATE_LOAD_MOVE_SAFE_FINAL, on_enter=None, on_exit=None),
+        State(STATE_UNLOAD_INIT, on_enter=None, on_exit=None),
+        State(STATE_UNLOAD_MOVE_LOADING, on_enter=None, on_exit=None),
+        State(STATE_UNLOAD_AT_LOADING, on_enter=None, on_exit=None),
+        State(STATE_UNLOAD_MOVE_SAFE, on_enter=None, on_exit=None),
+        State(STATE_UNLOAD_FLUSH, on_enter=None, on_exit=None),
+        State(STATE_ATC_INIT, on_enter=None, on_exit=None),
+        State(STATE_RETURN_MOVE_SAFE, on_enter=None, on_exit=None),
+        State(STATE_RETURN_MOVE_CLEARANCE, on_enter=None, on_exit=None),
+        State(STATE_RETURN_MOVE_CLOSE, on_enter=None, on_exit=None),
+        State(STATE_RETURN_MOVE_POCKET, on_enter=None, on_exit=None),
+        State(STATE_RETURN_LOITER_POCKET, on_enter=None, on_exit=None),
+        State(STATE_RETURN_MOVE_SIDE, on_enter=None, on_exit=None),
+        State(STATE_RETURN_FINAL, on_enter=None, on_exit=None),
+        State(STATE_RETRIEVE_MOVE_SAFE_INITIAL, on_enter=None, on_exit=None),
+        State(STATE_RETRIEVE_FLUSH, on_enter=None, on_exit=None),
+        State(STATE_RETRIEVE_MOVE_SIDE, on_enter=None, on_exit=None),
+        State(STATE_RETRIEVE_MOVE_POCKET, on_enter=None, on_exit=None),
+        State(STATE_RETRIEVE_LOITER_POCKET, on_enter=None, on_exit=None),
+        State(STATE_RETRIEVE_MOVE_CLOSE, on_enter=None, on_exit=None),
+        State(STATE_RETRIEVE_MOVE_CLEARANCE, on_enter=None, on_exit=None),
+        State(STATE_RETRIEVE_MOVE_SAFE_FINAL, on_enter=None, on_exit=None)
     ]
 
     current_tool_number = -1 # Derived from linuxcnc status TODO what is "no tool"?
     is_changing_tool = None # None (not currently executing tool change) or integer (tool number)
+    # TODO actual tool in spindle
     tool_table = () # Derived from linuxcnc status
     is_ok_for_mdi = False # Derived from linuxcnc status
     is_touching = False # Pin input
@@ -165,58 +165,61 @@ class StateMachine(object):
     is_changed = False # Pin output
 
     transitions = [
-        # The state machine should "restart" to StateStartup if Mdi becomes unavailable.
-        {'trigger': EventMdiNotReady, 'source': '*', 'dest': StateStartup},
-        # When Mdi is ready, go to StateIdle.
-        {'trigger': EventMdiReady, 'source': StateStartup, 'dest': StateIdle},
+        # The state machine should "restart" to STATE_WAITING if MDI becomes unavailable.
+        {'trigger': EVENT_NOT_READY, 'source': '*', 'dest': STATE_WAITING},
+        # When MDI is ready, go to STATE_IDLE.
+        {'trigger': EVENT_READY, 'source': STATE_WAITING, 'dest': STATE_IDLE},
 
-        # PI
-        # The operator requests loading a tool (from an empty pocket...)
-        {'trigger': EventRequestLoadTool, 'source': StateIdle, 'dest': StatePIMovingToLoadingXY},
-        # The machine reaches LoadingXY. Wait.
-        {'trigger': EventInPosition, 'source': StatePIMovingToLoadingXY, 'dest': StatePIAtLoadingXYClosed},
-        # The operator requests opening the chuck.
-        {'trigger': EventRequestOpenchuck, 'source': StatePIAtLoadingXYClosed, 'dest': StatePIAtLoadingXYOpen},
-        # The operator requests closing the chuck.
-        {'trigger': EventRequestClosechuck, 'source': StatePIAtLoadingXYOpen, 'dest': StatePIAtLoadingXYClosed},
-        # The operator, having loaded the tool, requests continuing the procedure.
-        {'trigger': EventRequestContinue, 'source': StatePIAtLoadingXYClosed, 'dest': StatePIMovingDownwards},
-        # The tool begins moving downwards until it touches off
-        {'trigger': EventTouchoffTouching, 'source': StatePIMovingDownwards, 'dest': StatePIRetracting},
-        # The tool retracts until it is in position
-        {'trigger': EventInPosition, 'source': StatePIRetracting, 'dest': StateATCMovingToSafe},
+        # Load and Probe
+        {'trigger': EVENT_REQUEST_LOAD, 'source': STATE_IDLE, 'dest': STATE_LOAD_INIT},
+        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_LOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
+        {'trigger': EVENT_LOAD_OK, 'source': STATE_LOAD_INIT, 'dest': STATE_LOAD_MOVE_LOADING},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_LOADING, 'dest': STATE_LOAD_AT_LOADING},
+        {'trigger': EVENT_REQUEST_CONTINUE, 'source': STATE_LOAD_AT_LOADING, 'dest': STATE_LOAD_PROBE},
+        {'trigger': EVENT_PROBE_TOUCHED, 'source': STATE_LOAD_PROBE, 'dest': STATE_LOAD_RETRACT},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_RETRACT, 'dest': STATE_LOAD_MOVE_SAFE_INITIAL},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_SAFE_INITIAL, 'dest': STATE_LOAD_MOVE_CLEARANCE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_CLEARANCE, 'dest': STATE_LOAD_MOVE_CLOSE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_CLOSE, 'dest': STATE_LOAD_MOVE_POCKET},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_POCKET, 'dest': STATE_LOAD_LOITER_POCKET},
+        {'trigger': EVENT_LOITER_COMPLETE, 'source': STATE_LOAD_LOITER_POCKET, 'dest': STATE_LOAD_MOVE_SIDE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_SIDE, 'dest': STATE_LOAD_MOVE_SAFE_FINAL},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_SAFE_FINAL, 'dest': STATE_IDLE},
 
         # Unload
-        {'trigger': EventRequestUnloadTool, 'source': StateIdle, 'dest': StateUnloadMovingToLoadingXY},
-        {'trigger': EventInPosition, 'source': StateUnloadMovingToLoadingXY, 'dest': StateUnloadAtLoadingXYClosed},
-        {'trigger': EventRequestOpenchuck, 'source': StateUnloadAtLoadingXYClosed, 'dest': StateUnloadAtLoadingXYOpen},
-        {'trigger': EventRequestClosechuck, 'source': StateUnloadAtLoadingXYOpen, 'dest': StateUnloadAtLoadingXYClosed},
-        {'trigger': EventRequestContinue, 'source': StateUnloadAtLoadingXYClosed , 'dest': StateUnloadAtLoadingXYDropCheckOpen},
-        {'trigger': EventDropCheckComplete, 'source': StateUnloadAtLoadingXYDropCheckOpen, 'dest': StateUnloadAtLoadingXYDropCheckClosed},
-        {'trigger': EventUnloadCompleted, 'source': StateUnloadAtLoadingXYDropCheckClosed, 'dest': StateIdle}, # internal
+        {'trigger': EVENT_REQUEST_UNLOAD, 'source': STATE_IDLE, 'dest': STATE_UNLOAD_INIT},
+        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_UNLOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
+        {'trigger': EVENT_UNLOAD_OK, 'source': STATE_UNLOAD_INIT, 'dest': STATE_UNLOAD_MOVE_LOADING},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_UNLOAD_MOVE_LOADING, 'dest': STATE_UNLOAD_AT_LOADING},
+        {'trigger': EVENT_REQUEST_CONTINUE, 'source': STATE_UNLOAD_AT_LOADING, 'dest': STATE_UNLOAD_MOVE_SAFE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_UNLOAD_MOVE_SAFE, 'dest': STATE_UNLOAD_FLUSH},
+        {'trigger': EVENT_FLUSH_COMPLETE, 'source': STATE_UNLOAD_FLUSH, 'dest': STATE_IDLE},
 
         # General ATC
-        {'trigger': EventRequestToolChange, 'source': StateIdle, 'dest': StateATCMovingToSafe},
-        {'trigger': EventInPosition, 'source': StateATCMovingToSafe, 'dest': StateATCAtSafe},
-        {'trigger': EventChangeCompleted, 'source': StateATCAtSafe, 'dest': StateIdle}, # internal
+        {'trigger': EVENT_REQUEST_ATC, 'source': STATE_IDLE, 'dest': STATE_ATC_INIT},
 
-        # ATC Returning
-        {'trigger': EventIsReturning, 'source': StateATCAtSafe, 'dest': StateATCReturningMovingToPocketFast},
-        {'trigger': EventInPosition, 'source': StateATCReturningMovingToPocketFast, 'dest': StateATCReturningInsertingIntoPocket},
-        {'trigger': EventInPosition, 'source': StateATCReturningInsertingIntoPocket, 'dest': StateATCReturningAtToolOpen},
-        {'trigger': EventInPosition, 'source': StateATCReturningAtToolOpen, 'dest': StateATCReturningRetractingOpen},
-        {'trigger': EventInPosition, 'source': StateATCReturningRetractingOpen, 'dest': StateATCReturningRetractingClosed},
-        {'trigger': EventInPosition, 'source': StateATCReturningRetractingClosed, 'dest': StateATCReturningMovingToSafe},
-        {'trigger': EventInPosition, 'source': StateATCReturningMovingToSafe, 'dest': StateATCAtSafe},
+        # ATC Return
+        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_ATC_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_SAFE, 'dest': STATE_RETURN_MOVE_CLEARANCE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_CLEARANCE, 'dest': STATE_RETURN_MOVE_CLOSE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_CLOSE, 'dest': STATE_RETURN_MOVE_POCKET},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_POCKET, 'dest': STATE_RETURN_LOITER_POCKET},
+        {'trigger': EVENT_LOITER_COMPLETE, 'source': STATE_RETURN_LOITER_POCKET, 'dest': STATE_RETURN_MOVE_SIDE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_SIDE, 'dest': STATE_RETURN_FINAL},
+        {'trigger': EVENT_CONTINUE_ATC, 'source': STATE_RETURN_FINAL, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
+        {'trigger': EVENT_CONTINUE_UNLOAD, 'source': STATE_RETURN_FINAL, 'dest': STATE_UNLOAD_MOVE_LOADING},
+        {'trigger': EVENT_CONTINUE_LOAD, 'source': STATE_RETURN_FINAL, 'dest': STATE_LOAD_MOVE_LOADING},
 
-        # ATC Retrieving
-        {'trigger': EventIsRetrieving, 'source': StateATCAtSafe, 'dest': StateATCRetrievingDropCheckOpen}, # internal
-        {'trigger': EventDropCheckComplete, 'source': StateATCRetrievingDropCheckOpen, 'dest': StateATCRetrievingMovingToPocketFast},
-        {'trigger': EventInPosition, 'source': StateATCRetrievingMovingToPocketFast, 'dest': StateATCRetrievingApproachingPocketOpen},
-        {'trigger': EventInPosition, 'source': StateATCRetrievingApproachingPocketOpen, 'dest': StateATCRetrievingAtToolClosed},
-        {'trigger': EventPocketTimerComplete, 'source': StateATCRetrievingAtToolClosed, 'dest': StateATCRetrievingRetracting},
-        {'trigger': EventInPosition, 'source': StateATCRetrievingRetracting, 'dest': StateATCRetrievingMovingToSafe},
-        {'trigger': EventInPosition, 'source': StateATCRetrievingMovingToSafe, 'dest': StateATCAtSafe},
+        # ATC Retrieval
+        {'trigger': EVENT_RETRIEVE_OK, 'source': STATE_ATC_INIT, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_SAFE_INITIAL, 'dest': STATE_RETRIEVE_FLUSH},
+        {'trigger': EVENT_FLUSH_COMPLETE, 'source': STATE_RETRIEVE_FLUSH, 'dest': STATE_RETRIEVE_MOVE_SIDE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_SIDE, 'dest': STATE_RETRIEVE_MOVE_POCKET},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_POCKET, 'dest': STATE_RETRIEVE_LOITER_POCKET},
+        {'trigger': EVENT_LOITER_COMPLETE, 'source': STATE_RETRIEVE_LOITER_POCKET, 'dest': STATE_RETRIEVE_MOVE_CLOSE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_CLOSE, 'dest': STATE_RETRIEVE_MOVE_CLEARANCE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_CLEARANCE, 'dest': STATE_RETRIEVE_MOVE_SAFE_FINAL},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_SAFE_FINAL, 'dest': STATE_IDLE},
     ]
 
     def __init__(self):
@@ -247,7 +250,7 @@ class StateMachine(object):
         if is_changing_tool != self.is_changing_tool:
             self.is_changing_tool = is_changing_tool
             if self.is_changing_tool:
-                self.machine.dispatch(EventRequestToolChange)
+                self.machine.dispatch(EVENT_REQUEST_ATC)
             else:
                 pass
                 # TODO ? Could possibly dispatch a end-of-atc type of event
@@ -255,7 +258,8 @@ class StateMachine(object):
     def set_is_touching(self, is_touching):
         if is_touching != self.is_touching:
             self.is_touching = is_touching
-            self.machine.dispatch(EventTouchoffTouching)
+            if self.is_touching:
+                self.machine.dispatch(EVENT_PROBE_TOUCHED)
 
     def set_current_tool_number(self, tool):
         self.current_tool_number = tool
@@ -269,9 +273,9 @@ class StateMachine(object):
             self.is_ok_for_mdi = is_ok_for_mdi
             # Dispatch appropriate event
             if self.is_ok_for_mdi:
-                self.machine.dispatch(EventMdiReady)
+                self.machine.dispatch(EVENT_READY)
             else:
-                self.machine.dispatch(EventMdiNotReady)
+                self.machine.dispatch(EVENT_NOT_READY)
                 panic()
 
     def open_chuck(self):
@@ -299,12 +303,12 @@ class StateMachine(object):
     def move_coord_absolute(self, coord, feed=3600, dispatch_in_position=True):
         send_gcode("G21 G53 G0 F{} X{} Y{} Z{}".format(feed, coord.x, coord.y, coord.z))
         if dispatch_in_position:
-            self.machine.dispatch(EventInPosition)
+            self.machine.dispatch(EVENT_IN_POSITION)
 
     def move_coord_relative(self, coord, feed=3600, dispatch_in_position=True):
         send_gcode("G21 G91 G0 F{} X{} Y{} Z{}".format(feed, coord.x, coord.y, coord.z))
         if dispatch_in_position:
-            self.machine.dispatch(EventInPosition)
+            self.machine.dispatch(EVENT_IN_POSITION)
 
     def move_pi_loading(self):
         # TODO avoid tool rack boundary
