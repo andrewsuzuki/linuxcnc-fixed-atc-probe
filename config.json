@@ -5,10 +5,10 @@
         "x": 0,
         "y": 50
     },
-    "pocket_above_chuck_offset_z": 10,
+    "pocket_above_close_offset_z": 10,
     "pocket_above_clearance_offset_z": 110,
     "loiter_seconds": 0.3,
-    "chuck_seconds": 0.8,
+    "flush_seconds": 0.8,
     "loading": {
         "x": 0,
         "y": 0,

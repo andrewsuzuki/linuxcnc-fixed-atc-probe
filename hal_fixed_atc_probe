@@ -5,6 +5,7 @@ import json
 import sys
 import linuxcnc
 import hal
+import threading
 from transitions import Machine, State
 from os.path import expanduser
 
@@ -30,12 +31,13 @@ STATE_UNLOAD_AT_LOADING = "STATE_UNLOAD_AT_LOADING"
 STATE_UNLOAD_MOVE_SAFE = "STATE_UNLOAD_MOVE_SAFE"
 STATE_UNLOAD_FLUSH = "STATE_UNLOAD_FLUSH"
 STATE_ATC_INIT = "STATE_ATC_INIT"
-STATE_RETURN_MOVE_SAFE = "STATE_RETURN_MOVE_SAFE"
+STATE_RETURN_MOVE_SAFE_INITIAL = "STATE_RETURN_MOVE_SAFE_INITIAL"
 STATE_RETURN_MOVE_CLEARANCE = "STATE_RETURN_MOVE_CLEARANCE"
 STATE_RETURN_MOVE_CLOSE = "STATE_RETURN_MOVE_CLOSE"
 STATE_RETURN_MOVE_POCKET = "STATE_RETURN_MOVE_POCKET"
 STATE_RETURN_LOITER_POCKET = "STATE_RETURN_LOITER_POCKET"
 STATE_RETURN_MOVE_SIDE = "STATE_RETURN_MOVE_SIDE"
+STATE_RETURN_MOVE_SAFE_FINAL = "STATE_RETURN_MOVE_SAFE_FINAL"
 STATE_RETURN_FINAL = "STATE_RETURN_FINAL"
 STATE_RETRIEVE_MOVE_SAFE_INITIAL = "STATE_RETRIEVE_MOVE_SAFE_INITIAL"
 STATE_RETRIEVE_FLUSH = "STATE_RETRIEVE_FLUSH"
@@ -108,8 +110,8 @@ def get_pocket_coord(number, coord_type):
         return base
     if coord_type == 'side':
         return add_coords(base, config.pocket_side_offset)
-    if coord_type == 'above-chuck':
-        return add_coords(base, {'z': config.pocket_above_chuck_offset_z})
+    if coord_type == 'above-close':
+        return add_coords(base, {'z': config.pocket_above_close_offset_z})
     if coord_type == 'above-clearance':
         return add_coords(base, {'z': config.pocket_above_clearance_offset_z})
     raise ValueError
@@ -118,41 +120,47 @@ class StateMachine(object):
     """Finite state machine for ATC and probe"""
 
     states = [
-        State(STATE_WAITING, on_enter=None, on_exit=None),
-        State(STATE_IDLE, on_enter=None, on_exit=None),
-        State(STATE_LOAD_INIT, on_enter=None, on_exit=None),
-        State(STATE_LOAD_MOVE_LOADING, on_enter=None, on_exit=None),
-        State(STATE_LOAD_AT_LOADING, on_enter=None, on_exit=None),
-        State(STATE_LOAD_PROBE, on_enter=None, on_exit=None),
-        State(STATE_LOAD_RETRACT, on_enter=None, on_exit=None),
-        State(STATE_LOAD_MOVE_SAFE_INITIAL, on_enter=None, on_exit=None),
-        State(STATE_LOAD_MOVE_CLEARANCE, on_enter=None, on_exit=None),
-        State(STATE_LOAD_MOVE_CLOSE, on_enter=None, on_exit=None),
-        State(STATE_LOAD_MOVE_POCKET, on_enter=None, on_exit=None),
-        State(STATE_LOAD_LOITER_POCKET, on_enter=None, on_exit=None),
-        State(STATE_LOAD_MOVE_SIDE, on_enter=None, on_exit=None),
-        State(STATE_LOAD_MOVE_SAFE_FINAL, on_enter=None, on_exit=None),
-        State(STATE_UNLOAD_INIT, on_enter=None, on_exit=None),
-        State(STATE_UNLOAD_MOVE_LOADING, on_enter=None, on_exit=None),
-        State(STATE_UNLOAD_AT_LOADING, on_enter=None, on_exit=None),
-        State(STATE_UNLOAD_MOVE_SAFE, on_enter=None, on_exit=None),
-        State(STATE_UNLOAD_FLUSH, on_enter=None, on_exit=None),
-        State(STATE_ATC_INIT, on_enter=None, on_exit=None),
-        State(STATE_RETURN_MOVE_SAFE, on_enter=None, on_exit=None),
-        State(STATE_RETURN_MOVE_CLEARANCE, on_enter=None, on_exit=None),
-        State(STATE_RETURN_MOVE_CLOSE, on_enter=None, on_exit=None),
-        State(STATE_RETURN_MOVE_POCKET, on_enter=None, on_exit=None),
-        State(STATE_RETURN_LOITER_POCKET, on_enter=None, on_exit=None),
-        State(STATE_RETURN_MOVE_SIDE, on_enter=None, on_exit=None),
-        State(STATE_RETURN_FINAL, on_enter=None, on_exit=None),
-        State(STATE_RETRIEVE_MOVE_SAFE_INITIAL, on_enter=None, on_exit=None),
-        State(STATE_RETRIEVE_FLUSH, on_enter=None, on_exit=None),
-        State(STATE_RETRIEVE_MOVE_SIDE, on_enter=None, on_exit=None),
-        State(STATE_RETRIEVE_MOVE_POCKET, on_enter=None, on_exit=None),
-        State(STATE_RETRIEVE_LOITER_POCKET, on_enter=None, on_exit=None),
-        State(STATE_RETRIEVE_MOVE_CLOSE, on_enter=None, on_exit=None),
-        State(STATE_RETRIEVE_MOVE_CLEARANCE, on_enter=None, on_exit=None),
-        State(STATE_RETRIEVE_MOVE_SAFE_FINAL, on_enter=None, on_exit=None)
+        State(STATE_WAITING, on_enter=['reset'], on_exit=None),
+        State(STATE_IDLE, on_enter=['reset'], on_exit=None),
+
+        State(STATE_LOAD_INIT, on_enter=['decide_load'], on_exit=None),
+        State(STATE_LOAD_MOVE_LOADING, on_enter=['move_loading'], on_exit=None),
+        State(STATE_LOAD_AT_LOADING, on_enter=None, on_exit=None), # TODO GUI "Continue"
+        State(STATE_LOAD_PROBE, on_enter=['probe'], on_exit=None),
+        State(STATE_LOAD_RETRACT, on_enter=['move_retract'], on_exit=None),
+        State(STATE_LOAD_MOVE_SAFE_INITIAL, on_enter=['move_safe'], on_exit=None),
+        State(STATE_LOAD_MOVE_CLEARANCE, on_enter=['move_pocket_above_clearance'], on_exit=None),
+        State(STATE_LOAD_MOVE_CLOSE, on_enter=['move_pocket_above_close'], on_exit=None),
+        State(STATE_LOAD_MOVE_POCKET, on_enter=['open_chuck', 'move_pocket'], on_exit=None),
+        State(STATE_LOAD_LOITER_POCKET, on_enter=['loiter'], on_exit=None),
+        State(STATE_LOAD_MOVE_SIDE, on_enter=['close_chuck', 'move_pocket_side'], on_exit=None),
+        State(STATE_LOAD_MOVE_SAFE_FINAL, on_enter=['move_safe'], on_exit=None),
+
+        State(STATE_UNLOAD_INIT, on_enter=['decide_unload'], on_exit=None),
+        State(STATE_UNLOAD_MOVE_LOADING, on_enter=['move_loading'], on_exit=None),
+        State(STATE_UNLOAD_AT_LOADING, on_enter=None, on_exit=None), # noop
+        State(STATE_UNLOAD_MOVE_SAFE, on_enter=['move_safe'], on_exit=None),
+        State(STATE_UNLOAD_FLUSH, on_enter=['flush_chuck'], on_exit=None),
+
+        State(STATE_ATC_INIT, on_enter=['decide_atc'], on_exit=None),
+
+        State(STATE_RETURN_MOVE_SAFE_INITIAL, on_enter=['move_safe'], on_exit=None),
+        State(STATE_RETURN_MOVE_SIDE, on_enter=['move_pocket_side'], on_exit=None),
+        State(STATE_RETURN_MOVE_POCKET, on_enter=['move_pocket'], on_exit=None),
+        State(STATE_RETURN_LOITER_POCKET, on_enter=['open_chuck', 'loiter'], on_exit=None),
+        State(STATE_RETURN_MOVE_CLOSE, on_enter=['move_pocket_above_close'], on_exit=None),
+        State(STATE_RETURN_MOVE_CLEARANCE, on_enter=['close_chuck', 'move_pocket_above_clearance'], on_exit=None),
+        State(STATE_RETURN_MOVE_SAFE_FINAL, on_enter=['move_safe'], on_exit=None),
+        State(STATE_RETURN_FINAL, on_enter=['decide_after_return'], on_exit=None),
+
+        State(STATE_RETRIEVE_MOVE_SAFE_INITIAL, on_enter=['move_safe'], on_exit=None),
+        State(STATE_RETRIEVE_FLUSH, on_enter=['flush_chuck'], on_exit=None),
+        State(STATE_RETRIEVE_MOVE_CLEARANCE, on_enter=['move_pocket_clearance'], on_exit=None),
+        State(STATE_RETRIEVE_MOVE_CLOSE, on_enter=['move_pocket_close'], on_exit=None),
+        State(STATE_RETRIEVE_MOVE_POCKET, on_enter=['open_chuck', 'move_pocket'], on_exit=None),
+        State(STATE_RETRIEVE_LOITER_POCKET, on_enter=['loiter'], on_exit=None),
+        State(STATE_RETRIEVE_MOVE_SIDE, on_enter=['close_chuck', 'move_pocket_side'], on_exit=None),
+        State(STATE_RETRIEVE_MOVE_SAFE_FINAL, on_enter=['move_safe'], on_exit=None)
     ]
 
     current_tool_number = -1 # Derived from linuxcnc status TODO what is "no tool"?
@@ -223,9 +231,7 @@ class StateMachine(object):
     ]
 
     def __init__(self):
-        """
-        Initialize the state machine
-        """
+        """Initialize the state machine"""
         self.machine = Machine(
             model=self,
             queued=True,
@@ -234,11 +240,46 @@ class StateMachine(object):
             initial=StateStartup
         )
 
+    def reset(self):
+        # TODO more...
+        # Ensure chuck is closed
+        self.close_chuck()
+
+    def decide_load(self):
+        # TODO clause
+        if True:
+            self.machine.dispatch(EVENT_LOAD_OK)
+        else:
+            self.machine.dispatch(EVENT_NEEDS_RETURN)
+
+    def decide_unload(self):
+        # TODO clause
+        if True:
+            self.machine.dispatch(EVENT_UNLOAD_OK)
+        else:
+            self.machine.dispatch(EVENT_NEEDS_RETURN)
+
+    def decide_atc(self):
+        # TODO clause
+        if True:
+            self.machine.dispatch(EVENT_RETRIEVE_OK)
+        else:
+            self.machine.dispatch(EVENT_NEEDS_RETURN)
+
+    def decide_after_return(self):
+        # TODO clauses
+        if True:
+            self.machine.dispatch(EVENT_CONTINUE_ATC)
+        elif True:
+            self.machine.dispatch(EVENT_CONTINUE_LOAD)
+        else:
+            self.machine.dispatch(EVENT_CONTINUE_UNLOAD)
+
     def request_load_tool(self, tool):
-        pass  # TODO
+        pass # TODO
 
     def request_unload_tool(self, tool):
-        pass  # TODO
+        pass # TODO
 
     def set_tool_change(self, is_tool_change, number, changed):
         # Derive
@@ -290,10 +331,10 @@ class StateMachine(object):
         def chuck_timer_cb():
             self.close_chuck()
             self.machine.dispatch(EVENT_FLUSH_COMPLETE)
-        timer = threading.Timer(config.chuck_seconds, chuck_timer_cb)
+        timer = threading.Timer(config.flush_seconds, chuck_timer_cb)
         timer.start()
 
-    def loiter_at_pocket(self):
+    def loiter(self):
         """Dispatch EVENT_LOITER_COMPLETE after config.loiter_seconds"""
         def loiter_timer_cb():
             self.machine.dispatch(EVENT_LOITER_COMPLETE)
@@ -310,37 +351,36 @@ class StateMachine(object):
         if dispatch_in_position:
             self.machine.dispatch(EVENT_IN_POSITION)
 
-    def move_pi_loading(self):
+    def move_loading(self):
         # TODO avoid tool rack boundary
         self.move_coord_absolute(config.loading)
 
-    def move_pi_touchoff(self):
-        # TODO tweak feedrate
-        self.move_coord_absolute(config.probe_limit, feed=10)
+    def probe(self):
+        pass # TODO probe/check loop
 
-    def move_pi_retract(self):
+    def move_retract(self):
         coord = {"x": 0, "y": 0, "z": config.probe_retract_offset_z}
         self.move_coord_relative(coord)
 
-    def move_atc_safe(self):
+    def move_safe(self):
         # TODO avoid tool rack boundary
         self.move_coord_absolute(config.safe)
 
-    def move_atc_pocket_side(self):
+    def move_pocket_side(self):
         coord = get_pocket_coord(self.is_changing_tool, 'side')
         self.move_coord_absolute(coord)
 
-    def move_atc_pocket(self):
+    def move_pocket(self):
         coord = get_pocket_coord(self.is_changing_tool, 'pocket')
         self.move_coord_absolute(coord)
 
-    def move_atc_chuck(self):
-        coord = get_pocket_coord(self.is_changing_tool, 'chuck')
+    def move_pocket_above_close(self):
+        coord = get_pocket_coord(self.is_changing_tool, 'above-close')
         self.move_coord_absolute(coord)
 
-    def move_atc_clearance(self):
+    def move_pocket_above_clearance(self):
         # TODO avoid tool rack boundary (when returning)
-        coord = get_pocket_coord(self.is_changing_tool, 'clearance')
+        coord = get_pocket_coord(self.is_changing_tool, 'above-clearance')
         self.move_coord_absolute(coord)
 
 # Configure HAL Component

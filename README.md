@@ -38,6 +38,7 @@ TODO pins
 
 ## TODO
 
+- Update for new state machine
 - Idle enter reset
 - Save/restore modal state (M70 and M72)
 - Tool table updates (G43 or G20) after probing
@@ -45,10 +46,19 @@ TODO pins
 - More GUI
   - "Continue" functionality
 - Tweak feeds
-- Update for new state machine
+- Cancel current program (using command api?) if toolchange fails (for example,
+  tool doesn't exist in table)
 
-### Operator Loads Tool
-
+Decisions on begin load/unload:
+- if spindle unloaded
+  1. [attempt to] retrieve target tool
+  2. go to loading, continue...
+- if spindle loaded, it's the target tool
+  1. go to loading, continue...
+- if spindle loaded, it's not the target tool
+  1. return current tool
+  2. [attempt to] retrieve target tool
+  3. go to loading, continue...
 
 ## Configuration
 
@@ -61,14 +71,16 @@ See `config.json` as an example.
 - `probe_retract_offset_z`: Relative z offset after probe touchoff.
 - `pocket_side_offset`: Relative x/y offset (map) for pocket sides (where it
   will slow down for insertion/removal), calculated from individual pockets.
-- `pocket_above_chuck_offset_z`: Relative z offset from individual pockets
+- `pocket_above_close_offset_z`: Relative z offset from individual pockets
   where the chuck will open/close (depending on if it's retrieving/returning).
 - `pocket_above_clearance_offset_z`: Relative z offset from individual pockets
-  where the chuck is free to move in the xy plane (towards/away from the tool
+  where the machine is free to move in the xy plane (towards/away from the tool
   rack). Must account for height of the tool holder and pull stud above the
   pocket.
-- `chuck_seconds`: Time in seconds where the chuck will remain open after
-  reaching the pocket.
+- `loiter_seconds`: Time in seconds where the chuck will remain open at the
+  pocket after reaching it.
+- `flush_seconds`: Time to open the chuck as a safety procedure before inserting
+  a tool into the rack
 - `loading`: absolute x/y/z coordinate (map) of the loading position. x/y SHOULD
   be equal to the x/y of `probe_limit` (below)
 - `probe_limit`: absolute x/y/z coordinate (map) of the probe position (the
