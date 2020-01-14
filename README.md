@@ -38,12 +38,9 @@ TODO pins
 
 ## TODO
 
-- Decide on new StateMachine fields
-- Idle enter reset
 - Save/restore modal state (M70 and M72)
 - Tool table updates (G43 or G20) after touchoff
   - Also, wipe tool table entry when starting (in case it's cancelled)
-- state.is_changed output
 - Tweak feeds
 - Cancel current program (using command api?) if toolchange fails (for example,
   tool doesn't exist in table)

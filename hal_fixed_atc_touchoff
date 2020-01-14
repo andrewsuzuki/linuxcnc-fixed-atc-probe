@@ -119,19 +119,19 @@ class StateMachine(object):
         State(STATE_WAITING, on_enter=['reset'], on_exit=None),
         State(STATE_IDLE, on_enter=['reset'], on_exit=None),
 
-        State(STATE_LOAD_INIT, on_enter=['decide_load'], on_exit=None),
+        State(STATE_LOAD_INIT, on_enter=['at_load_init'], on_exit=None),
         State(STATE_LOAD_MOVE_LOADING, on_enter=['move_loading'], on_exit=None),
         State(STATE_LOAD_AT_LOADING, on_enter=['open_continue_window'], on_exit=None),
-        State(STATE_LOAD_TOUCHOFF, on_enter=['touchoff'], on_exit=None),
+        State(STATE_LOAD_TOUCHOFF, on_enter=['assume_loaded', 'touchoff'], on_exit=None),
         State(STATE_LOAD_RETRACT, on_enter=['move_retract'], on_exit=None),
 
-        State(STATE_UNLOAD_INIT, on_enter=['decide_unload'], on_exit=None),
+        State(STATE_UNLOAD_INIT, on_enter=['at_unload_init'], on_exit=None),
         State(STATE_UNLOAD_MOVE_LOADING, on_enter=['move_loading'], on_exit=None),
         State(STATE_UNLOAD_AT_LOADING, on_enter=None, on_exit=None), # noop
-        State(STATE_UNLOAD_MOVE_SAFE, on_enter=['move_safe'], on_exit=None),
+        State(STATE_UNLOAD_MOVE_SAFE, on_enter=['assume_unloaded', 'move_safe'], on_exit=None),
         State(STATE_UNLOAD_FLUSH, on_enter=['flush_chuck'], on_exit=None),
 
-        State(STATE_ATC_INIT, on_enter=['decide_atc'], on_exit=None),
+        State(STATE_ATC_INIT, on_enter=['at_atc_init'], on_exit=None),
 
         State(STATE_RETURN_MOVE_SAFE_INITIAL, on_enter=['move_safe'], on_exit=None),
         State(STATE_RETURN_MOVE_SIDE, on_enter=['move_pocket_side'], on_exit=None),
@@ -140,7 +140,7 @@ class StateMachine(object):
         State(STATE_RETURN_MOVE_CLOSE, on_enter=['move_pocket_above_close'], on_exit=None),
         State(STATE_RETURN_MOVE_CLEARANCE, on_enter=['close_chuck', 'move_pocket_above_clearance'], on_exit=None),
         State(STATE_RETURN_MOVE_SAFE_FINAL, on_enter=['move_safe'], on_exit=None),
-        State(STATE_RETURN_FINAL, on_enter=['decide_after_return'], on_exit=None),
+        State(STATE_RETURN_FINAL, on_enter=['at_return_final'], on_exit=None),
 
         State(STATE_RETRIEVE_MOVE_SAFE_INITIAL, on_enter=['move_safe'], on_exit=None),
         State(STATE_RETRIEVE_FLUSH, on_enter=['flush_chuck'], on_exit=None),
@@ -150,17 +150,8 @@ class StateMachine(object):
         State(STATE_RETRIEVE_LOITER_POCKET, on_enter=['loiter'], on_exit=None),
         State(STATE_RETRIEVE_MOVE_SIDE, on_enter=['close_chuck', 'move_pocket_side'], on_exit=None),
         State(STATE_RETRIEVE_MOVE_SAFE_FINAL, on_enter=['move_safe'], on_exit=None),
-        State(STATE_RETRIEVE_FINAL, on_enter=['decide_after_retrieve'], on_exit=None)
+        State(STATE_RETRIEVE_FINAL, on_enter=['at_retrieve_final'], on_exit=None)
     ]
-
-    current_tool_number = -1 # Derived from linuxcnc status TODO what is "no tool"?
-    is_changing_tool = None # None (not currently executing tool change) or integer (tool number)
-    # TODO actual tool in spindle
-    tool_table = () # Derived from linuxcnc status
-    is_ok_for_mdi = False # Derived from linuxcnc status
-    is_touching = False # Pin input
-    is_chuck_open = False # Pin output
-    is_changed = False # Pin output
 
     transitions = [
         # The state machine should "restart" to STATE_WAITING if MDI becomes unavailable.
@@ -220,6 +211,20 @@ class StateMachine(object):
         {'trigger': EVENT_CONTINUE_LOAD, 'source': STATE_RETRIEVE_FINAL, 'dest': STATE_LOAD_INIT},
     ]
 
+    # Attributes
+    tool_linuxcnc = None # None or tool #
+    tool_changing = None # None (not currently executing tool change) or tool #
+    tool_loadunload = None # None (not currently executing load/unload) or tool #
+    tool_actual = None # None (no tool in spindle) or tool # (possible tool could not be in spindle if retrieved for load)
+    loadunload_mode = None # None, 'load', 'unload'
+    tool_table = [] # List of tuples TODO is it a list or tuple?
+    actual_position = {'x': 0, 'y': 0, 'z': 0} # coord map
+    is_ok_for_mdi = False # Boolean
+    # HAL I/O:
+    is_touching = False # Pin input
+    is_chuck_open = False # Pin output
+    is_changed = False # Pin output
+
     def __init__(self):
         """Initialize the state machine"""
         self.machine = Machine(
@@ -227,58 +232,106 @@ class StateMachine(object):
             queued=True,
             states=StateMachine.states,
             transitions=StateMachine.transitions,
-            initial=StateStartup
+            initial=STATE_WAITING
         )
 
     def reset(self):
-        # TODO more...
-        # Ensure chuck is closed
+        self.tool_linuxcnc = None
+        self.tool_changing = None
+        self.tool_loadunload = None
+        # (don't change self.tool_actual)
+        self.loadunload_mode = None
+        self.is_touching = False
         self.close_chuck()
+        self.is_changed = False
 
-    def decide_load(self):
-        # TODO clauses
-        if True:
+    def at_loadunload_init(self):
+        if not self.tool_actual:
+            # no tool loaded, attempt to retrieve
+            self.machine.dispatch(EVENT_NEEDS_RETRIEVE)
+        elif self.tool_actual != self.tool_loadunload:
+            # loaded tool doesn't match requested, return it first
+            self.machine.dispatch(EVENT_NEEDS_RETURN)
+        elif self.loadunload_mode == 'load':
+            # loaded tool matches requested, good to go
             self.machine.dispatch(EVENT_LOAD_OK)
-        elif True:
-            self.machine.dispatch(EVENT_NEEDS_RETRIEVE)
-        else:
-            self.machine.dispatch(EVENT_NEEDS_RETURN)
-
-    def decide_unload(self):
-        # TODO clauses
-        if True:
+        elif self.loadunload_mode == 'unload':
+            # loaded tool matches requested, good to go
             self.machine.dispatch(EVENT_UNLOAD_OK)
-        elif True:
-            self.machine.dispatch(EVENT_NEEDS_RETRIEVE)
         else:
-            self.machine.dispatch(EVENT_NEEDS_RETURN)
+            panic()
 
-    def decide_atc(self):
-        # TODO clause
-        if True:
+    def at_load_init(self):
+        self.loadunload_mode = 'load'
+        self.at_loadunload_init()
+
+    def at_unload_init(self):
+        self.loadunload_mode = 'unload'
+        self.at_loadunload_init()
+
+    def assume_loaded(self):
+        self.tool_actual = self.tool_loadunload
+
+    def assume_unloaded(self):
+        self.tool_actual = None
+
+    def at_atc_init(self):
+        if self.tool_actual:
+            # a tool is loaded, return it first
+            self.machine.dispatch(EVENT_NEEDS_RETURN)
+        else:
+            # no tool loaded, proceed to retrieve requested tool
             self.machine.dispatch(EVENT_RETRIEVE_OK)
-        else:
-            self.machine.dispatch(EVENT_NEEDS_RETURN)
 
-    def decide_after_return(self):
-        # TODO clauses
-        if True:
+    def at_return_final(self):
+        previous = self.tool_actual
+
+        if not previous:
+            panic()
+        elif self.tool_changing and not self.loadunload_mode and not self.tool_loadunload:
+            # this is atc
+            self.tool_actual = None
             self.machine.dispatch(EVENT_CONTINUE_ATC)
-        elif True:
-            self.machine.dispatch(EVENT_LOAD_COMPLETE)
-        elif True:
-            self.machine.dispatch(EVENT_CONTINUE_LOAD)
+        elif not self.tool_changing and self.loadunload_mode and self.tool_loadunload:
+            # this is load/unload
+            if self.loadunload_mode == 'load' and previous == self.tool_loadunload:
+                # putting new tool back after successful load / touchoff
+                self.tool_actual = None
+                self.machine.dispatch(EVENT_LOAD_COMPLETE)
+            elif self.loadunload_mode == 'load' and previous != self.tool_loadunload:
+                # load setup
+                self.tool_actual = None
+                self.machine.dispatch(EVENT_CONTINUE_LOAD)
+            elif self.loadunload_mode == 'unload' and previous != self.tool_loadunload:
+                # unload setup
+                self.tool_actual = None
+                self.machine.dispatch(EVENT_CONTINUE_UNLOAD)
+            else:
+                panic()
         else:
-            self.machine.dispatch(EVENT_CONTINUE_UNLOAD)
+            panic()
 
-    def decide_after_retrieve(self):
-        # TODO clauses
-        if True:
+    def at_retrieve_final(self):
+        if self.tool_actual:
+            panic()
+        elif self.tool_changing and not self.loadunload_mode and not self.tool_loadunload:
+            # atc is complete
+            self.tool_actual = self.tool_changing
+            self.is_changed = True
             self.machine.dispatch(EVENT_ATC_COMPLETE)
-        elif True:
-            self.machine.dispatch(EVENT_CONTINUE_LOAD)
+            # TODO will is_changed be picked up by HAL? I don't think so.
+            # Perhaps EVENT_ATC_COMPLETE should be dispatched in
+            # set_tool_change. Alternatively, make a new state that is in charge
+            # of waiting for linuxcnc acknowledgement
+        elif not self.tool_changing and self.loadunload_mode and self.tool_loadunload:
+            # load setup
+            self.tool_actual = self.tool_loadunload
+            if self.loadunload_mode == 'load':
+                self.machine.dispatch(EVENT_CONTINUE_LOAD)
+            else:
+                self.machine.dispatch(EVENT_CONTINUE_UNLOAD)
         else:
-            self.machine.dispatch(EVENT_CONTINUE_UNLOAD)
+            panic()
 
     def open_continue_window(self):
         continue_layout = [[sg.Text('Click start to start the tool setting procedure.')],
@@ -299,14 +352,14 @@ class StateMachine(object):
 
     def set_tool_change(self, is_tool_change, number, changed):
         # Derive
-        is_changing_tool = None
+        tool_changing = None
         if is_tool_change and number and not changed:
-            is_changing_tool = number
+            tool_changing = number
 
         # If changed...
-        if is_changing_tool != self.is_changing_tool:
-            self.is_changing_tool = is_changing_tool
-            if self.is_changing_tool:
+        if tool_changing != self.tool_changing
+            self.tool_changing = tool_changing
+            if self.tool_changing
                 self.machine.dispatch(EVENT_REQUEST_ATC)
             else:
                 pass
@@ -318,11 +371,14 @@ class StateMachine(object):
             if self.is_touching:
                 self.machine.dispatch(EVENT_TOUCHOFF_TOUCHED)
 
-    def set_current_tool_number(self, tool):
-        self.current_tool_number = tool
+    def set_tool_linuxcnc(self, tool):
+        self.tool_linuxcnc = tool
 
     def set_tool_table(self, tool_table):
         self.tool_table = tool_table
+
+    def set_actual_position(self, actual_position):
+        self.actual_position = actual_position
 
     def set_is_ok_for_mdi(self, is_ok_for_mdi):
         # If changed...
@@ -332,8 +388,8 @@ class StateMachine(object):
             if self.is_ok_for_mdi:
                 self.machine.dispatch(EVENT_READY)
             else:
+                print "ERROR: Not ready for MDI"
                 self.machine.dispatch(EVENT_NOT_READY)
-                panic()
 
     def open_chuck(self):
         self.is_chuck_open = True
@@ -357,46 +413,67 @@ class StateMachine(object):
         timer = threading.Timer(config.loiter_seconds, loiter_timer_cb)
         timer.start()
 
-    def move_coord_absolute(self, coord, feed=3600, dispatch_in_position=True):
-        send_gcode("G21 G53 G0 F{} X{} Y{} Z{}".format(feed, coord.x, coord.y, coord.z))
+    def move_coord_absolute(self, coord, feed=3600, dispatch_in_position=True, no_z=False):
+        # TODO avoid tool rack boundary
+        gcode_base = "G21 G53 G0 F{} X{} Y{}".format(feed, coord.x, coord.y)
+        gcode_final = gcode_base if no_z else (gcode_base + " Z{}".format(coord.z))
+        send_gcode(gcode_final)
         if dispatch_in_position:
             self.machine.dispatch(EVENT_IN_POSITION)
 
     def move_coord_relative(self, coord, feed=3600, dispatch_in_position=True):
+        # TODO avoid tool rack boundary
         send_gcode("G21 G91 G0 F{} X{} Y{} Z{}".format(feed, coord.x, coord.y, coord.z))
         if dispatch_in_position:
             self.machine.dispatch(EVENT_IN_POSITION)
 
     def move_loading(self):
-        # TODO avoid tool rack boundary
+        """Move to loading position (XYZ)"""
         self.move_coord_absolute(config.loading)
 
+    def move_loading_xy(self):
+        """Move to loading position (XY), maintaining current Z, and no EVENT_IN_POSITION"""
+        self.move_coord_absolute(config.loading, dispatch_in_position=False, no_z=True)
+
     def touchoff(self):
-        pass # TODO touchoff/check loop
+        self.move_loading_xy()
+
+        coord = {"x": 0, "y": 0, "z": config.touchoff_step_z}
+
+        def touchoff_loop():
+            while True:
+                # check if beyond touchoff limit
+                if self.actual_position.z < config.touchoff_limit_z:
+                    print "ERROR: Too low! Stopping before crash, if it hasn't already happened."
+                    panic()
+                # break if touching, or already touched
+                if self.machine.state != STATE_LOAD_TOUCHOFF or self.is_touching
+                    break
+                self.move_coord_relative(coord)
+        t = threading.Thread(target=touchoff_loop)
+        t.start()
 
     def move_retract(self):
         coord = {"x": 0, "y": 0, "z": config.touchoff_retract_offset_z}
         self.move_coord_relative(coord)
 
     def move_safe(self):
-        # TODO avoid tool rack boundary
         self.move_coord_absolute(config.safe)
 
     def move_pocket_side(self):
-        coord = get_pocket_coord(self.is_changing_tool, 'side')
+        coord = get_pocket_coord(self.tool_changing, 'side')
         self.move_coord_absolute(coord)
 
     def move_pocket(self):
-        coord = get_pocket_coord(self.is_changing_tool, 'pocket')
+        coord = get_pocket_coord(self.tool_changing, 'pocket')
         self.move_coord_absolute(coord)
 
     def move_pocket_above_close(self):
-        coord = get_pocket_coord(self.is_changing_tool, 'above-close')
+        coord = get_pocket_coord(self.tool_changing, 'above-close')
         self.move_coord_absolute(coord)
 
     def move_pocket_above_clearance(self):
-        # TODO avoid tool rack boundary (when returning)
-        coord = get_pocket_coord(self.is_changing_tool, 'above-clearance')
+        coord = get_pocket_coord(self.tool_changing, 'above-clearance')
         self.move_coord_absolute(coord)
 
 # Configure HAL Component
@@ -442,8 +519,10 @@ def status_routine(state, status):
         panic()
 
     # Read status into state
-    state.set_current_tool_number(status.tool_in_spindle)  # integer
-    state.set_tool_table(status.tool_table)  # array
+    state.set_tool_linuxcnc(None if status.tool_in_spindle == -1 else status.tool_in_spindle) # TODO what is "no tool"? -1?
+    state.set_tool_table(status.tool_table)
+    ap = status.actual_position
+    state.set_actual_position({'x': ap[0], 'y': ap[1], 'z': ap[2]})
     state.set_is_ok_for_mdi(not status.estop and status.enabled and status.homed and (
         status.interp_state == linuxcnc.INTERP_IDLE))
     # state.set_task_mode(status.task_mode) # mdi, auto, manual

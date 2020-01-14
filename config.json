@@ -1,6 +1,8 @@
 {
     "touchoff_length_compensation_offset": -100,
-    "touchoff_retract_offset_z": 10,
+    "touchoff_step_z": -0.2,
+    "touchoff_retract_offset_z": 110,
+    "touchoff_limit_z": -200,
     "pocket_side_offset": {
         "x": 0,
         "y": 50
@@ -10,11 +12,6 @@
     "loiter_seconds": 0.3,
     "flush_seconds": 0.8,
     "loading": {
-        "x": 0,
-        "y": 0,
-        "z": 0
-    },
-    "touchoff_limit": {
         "x": 0,
         "y": 0,
         "z": 0
