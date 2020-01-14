@@ -16,7 +16,7 @@ STATE_IDLE = "STATE_IDLE"
 STATE_LOAD_INIT = "STATE_LOAD_INIT"
 STATE_LOAD_MOVE_LOADING = "STATE_LOAD_MOVE_LOADING"
 STATE_LOAD_AT_LOADING = "STATE_LOAD_AT_LOADING"
-STATE_LOAD_PROBE = "STATE_LOAD_PROBE"
+STATE_LOAD_TOUCHOFF = "STATE_LOAD_TOUCHOFF"
 STATE_LOAD_RETRACT = "STATE_LOAD_RETRACT"
 STATE_UNLOAD_INIT = "STATE_UNLOAD_INIT"
 STATE_UNLOAD_MOVE_LOADING = "STATE_UNLOAD_MOVE_LOADING"
@@ -48,13 +48,14 @@ EVENT_REQUEST_LOAD = "EVENT_REQUEST_LOAD"
 EVENT_REQUEST_UNLOAD = "EVENT_REQUEST_UNLOAD"
 EVENT_REQUEST_ATC = "EVENT_REQUEST_ATC"
 EVENT_REQUEST_CONTINUE = "EVENT_REQUEST_CONTINUE"
+EVENT_REQUEST_CANCEL = "EVENT_REQUEST_CANCEL"
 EVENT_NEEDS_RETURN = "EVENT_NEEDS_RETURN"
 EVENT_NEEDS_RETRIEVE = "EVENT_NEEDS_RETRIEVE"
 EVENT_LOAD_OK = "EVENT_LOAD_OK"
 EVENT_UNLOAD_OK = "EVENT_UNLOAD_OK"
 EVENT_RETRIEVE_OK = "EVENT_RETRIEVE_OK"
 EVENT_IN_POSITION = "EVENT_IN_POSITION"
-EVENT_PROBE_TOUCHED = "EVENT_PROBE_TOUCHED"
+EVENT_TOUCHOFF_TOUCHED = "EVENT_TOUCHOFF_TOUCHED"
 EVENT_LOITER_COMPLETE = "EVENT_LOITER_COMPLETE"
 EVENT_FLUSH_COMPLETE = "EVENT_FLUSH_COMPLETE"
 EVENT_CONTINUE_ATC = "EVENT_CONTINUE_ATC"
@@ -63,16 +64,16 @@ EVENT_CONTINUE_LOAD = "EVENT_CONTINUE_LOAD"
 
 def panic():
     """Panic by logging fatal error and exiting"""
-    print "hal_fixed_atc_probe encountered a fatal error. Stopping."
+    print "hal_fixed_atc_touchoff encountered a fatal error. Stopping."
     sys.exit(1)
 
 # Config
 config = None
 try:
-    with open(expanduser('~/hal_fixed_atc_probe_config.json')) as config_file:
+    with open(expanduser('~/hal_fixed_atc_touchoff_config.json')) as config_file:
         config = json.load(config_file)
 except Exception as ex:
-    print "Couldn't find config file at ~/hal_fixed_atc_probe_config.json"
+    print "Couldn't find config file at ~/hal_fixed_atc_touchoff_config.json"
     sys.exit(1)
 
 def merge_coords(coords):
@@ -112,7 +113,7 @@ def get_pocket_coord(number, coord_type):
     raise ValueError
 
 class StateMachine(object):
-    """Finite state machine for ATC and probe"""
+    """Finite state machine for ATC and touchoff"""
 
     states = [
         State(STATE_WAITING, on_enter=['reset'], on_exit=None),
@@ -120,8 +121,8 @@ class StateMachine(object):
 
         State(STATE_LOAD_INIT, on_enter=['decide_load'], on_exit=None),
         State(STATE_LOAD_MOVE_LOADING, on_enter=['move_loading'], on_exit=None),
-        State(STATE_LOAD_AT_LOADING, on_enter=None, on_exit=None), # TODO GUI "Continue"
-        State(STATE_LOAD_PROBE, on_enter=['probe'], on_exit=None),
+        State(STATE_LOAD_AT_LOADING, on_enter=['open_continue_window'], on_exit=None),
+        State(STATE_LOAD_TOUCHOFF, on_enter=['touchoff'], on_exit=None),
         State(STATE_LOAD_RETRACT, on_enter=['move_retract'], on_exit=None),
 
         State(STATE_UNLOAD_INIT, on_enter=['decide_unload'], on_exit=None),
@@ -167,14 +168,15 @@ class StateMachine(object):
         # When MDI is ready, go to STATE_IDLE.
         {'trigger': EVENT_READY, 'source': STATE_WAITING, 'dest': STATE_IDLE},
 
-        # Load and Probe
+        # Load and Touchoff
         {'trigger': EVENT_REQUEST_LOAD, 'source': STATE_IDLE, 'dest': STATE_LOAD_INIT},
         {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_LOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
         {'trigger': EVENT_NEEDS_RETRIEVE, 'source': STATE_LOAD_INIT, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
         {'trigger': EVENT_LOAD_OK, 'source': STATE_LOAD_INIT, 'dest': STATE_LOAD_MOVE_LOADING},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_LOADING, 'dest': STATE_LOAD_AT_LOADING},
-        {'trigger': EVENT_REQUEST_CONTINUE, 'source': STATE_LOAD_AT_LOADING, 'dest': STATE_LOAD_PROBE},
-        {'trigger': EVENT_PROBE_TOUCHED, 'source': STATE_LOAD_PROBE, 'dest': STATE_LOAD_RETRACT},
+        {'trigger': EVENT_REQUEST_CONTINUE, 'source': STATE_LOAD_AT_LOADING, 'dest': STATE_LOAD_TOUCHOFF},
+        {'trigger': EVENT_REQUEST_CANCEL, 'source': STATE_LOAD_AT_LOADING, 'dest': STATE_IDLE},
+        {'trigger': EVENT_TOUCHOFF_TOUCHED, 'source': STATE_LOAD_TOUCHOFF, 'dest': STATE_LOAD_RETRACT},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_RETRACT, 'dest': STATE_RETURN_MOVE_SAFE_INITIAL},
 
         # Unload
@@ -278,6 +280,17 @@ class StateMachine(object):
         else:
             self.machine.dispatch(EVENT_CONTINUE_UNLOAD)
 
+    def open_continue_window(self):
+        continue_layout = [[sg.Text('Click start to start the tool setting procedure.')],
+                           [sg.Text('THE ALLIGATOR CLIP MUST BE ATTACHED TO THE TOOL')],
+                           [sg.Button('Start'), sg.Button('Cancel')]]
+        continue_window = sg.Window('Tool Setter', layout).Finalize()
+        event, values = continue_window.Read(timeout=None)
+        if event == 'Start':
+            self.machine.dispatch(EVENT_REQUEST_CONTINUE)
+        else:
+            self.machine.dispatch(EVENT_REQUEST_CANCEL)
+
     def request_load_tool(self, tool):
         pass # TODO
 
@@ -303,7 +316,7 @@ class StateMachine(object):
         if is_touching != self.is_touching:
             self.is_touching = is_touching
             if self.is_touching:
-                self.machine.dispatch(EVENT_PROBE_TOUCHED)
+                self.machine.dispatch(EVENT_TOUCHOFF_TOUCHED)
 
     def set_current_tool_number(self, tool):
         self.current_tool_number = tool
@@ -358,11 +371,11 @@ class StateMachine(object):
         # TODO avoid tool rack boundary
         self.move_coord_absolute(config.loading)
 
-    def probe(self):
-        pass # TODO probe/check loop
+    def touchoff(self):
+        pass # TODO touchoff/check loop
 
     def move_retract(self):
-        coord = {"x": 0, "y": 0, "z": config.probe_retract_offset_z}
+        coord = {"x": 0, "y": 0, "z": config.touchoff_retract_offset_z}
         self.move_coord_relative(coord)
 
     def move_safe(self):
@@ -387,12 +400,12 @@ class StateMachine(object):
         self.move_coord_absolute(coord)
 
 # Configure HAL Component
-h = hal.component("hal_fixed_atc_probe")
+h = hal.component("hal_fixed_atc_touchoff")
 # IN:
 h.newpin("number", hal.HAL_FLOAT, hal.HAL_IN)
 h.newpin("tool_prepare", hal.HAL_BIT, hal.HAL_IN)  # looped to `prepared`
 h.newpin("tool_change", hal.HAL_BIT, hal.HAL_IN)
-h.newpin("probe", hal.HAL_BIT, hal.HAL_IN)
+h.newpin("touchoff", hal.HAL_BIT, hal.HAL_IN)
 # OUT:
 h.newpin("prepared", hal.HAL_BIT, hal.HAL_OUT)  # looped to `tool_prepare`
 h.newpin("changed", hal.HAL_BIT, hal.HAL_OUT)
@@ -401,13 +414,13 @@ h.ready()
 
 # Configure GUI window
 layout = [[sg.Text('Tool # = Pocket #')],
-          [sg.Text('Load/Probe Tool #'), sg.InputText(key='InputLoad',
+          [sg.Text('Load/Touch off Tool #'), sg.InputText(key='InputLoad',
                                                       size=(3, 1), do_not_clear=False), sg.Button('Load')],
           [sg.Text('Unload Tool #'), sg.InputText(key='InputUnload',
                                                   size=(3, 1), do_not_clear=False), sg.Button('Unload')],
           # output for stdout/stderr
           [sg.Output(size=(50, 10))]]
-window = sg.Window('Tool Changer and Probe', layout).Finalize()
+window = sg.Window('Tool Changer and Touch-Off', layout).Finalize()
 
 def send_gcode(gcode):
     """G-code sender"""
@@ -444,7 +457,7 @@ def hal_routine(state):
 
     # input pins
     state.set_tool_change(h.tool_change == 1, h.number, h.changed == 1)
-    state.set_is_touching(h.probe == 1)
+    state.set_is_touching(h.touchoff == 1)
     # ouput pins
     h.chuck = 1 if state.is_chuck_open else 0
     h.changed = 1 if state.is_changed else 0
