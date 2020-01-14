@@ -18,13 +18,6 @@ STATE_LOAD_MOVE_LOADING = "STATE_LOAD_MOVE_LOADING"
 STATE_LOAD_AT_LOADING = "STATE_LOAD_AT_LOADING"
 STATE_LOAD_PROBE = "STATE_LOAD_PROBE"
 STATE_LOAD_RETRACT = "STATE_LOAD_RETRACT"
-STATE_LOAD_MOVE_SAFE_INITIAL = "STATE_LOAD_MOVE_SAFE_INITIAL"
-STATE_LOAD_MOVE_CLEARANCE = "STATE_LOAD_MOVE_CLEARANCE"
-STATE_LOAD_MOVE_CLOSE = "STATE_LOAD_MOVE_CLOSE"
-STATE_LOAD_MOVE_POCKET = "STATE_LOAD_MOVE_POCKET"
-STATE_LOAD_LOITER_POCKET = "STATE_LOAD_LOITER_POCKET"
-STATE_LOAD_MOVE_SIDE = "STATE_LOAD_MOVE_SIDE"
-STATE_LOAD_MOVE_SAFE_FINAL = "STATE_LOAD_MOVE_SAFE_FINAL"
 STATE_UNLOAD_INIT = "STATE_UNLOAD_INIT"
 STATE_UNLOAD_MOVE_LOADING = "STATE_UNLOAD_MOVE_LOADING"
 STATE_UNLOAD_AT_LOADING = "STATE_UNLOAD_AT_LOADING"
@@ -47,6 +40,7 @@ STATE_RETRIEVE_LOITER_POCKET = "STATE_RETRIEVE_LOITER_POCKET"
 STATE_RETRIEVE_MOVE_CLOSE = "STATE_RETRIEVE_MOVE_CLOSE"
 STATE_RETRIEVE_MOVE_CLEARANCE = "STATE_RETRIEVE_MOVE_CLEARANCE"
 STATE_RETRIEVE_MOVE_SAFE_FINAL = "STATE_RETRIEVE_MOVE_SAFE_FINAL"
+STATE_RETRIEVE_FINAL = "STATE_RETRIEVE_FINAL"
 
 EVENT_NOT_READY= "EVENT_NOT_READY"
 EVENT_READY = "EVENT_READY"
@@ -55,6 +49,7 @@ EVENT_REQUEST_UNLOAD = "EVENT_REQUEST_UNLOAD"
 EVENT_REQUEST_ATC = "EVENT_REQUEST_ATC"
 EVENT_REQUEST_CONTINUE = "EVENT_REQUEST_CONTINUE"
 EVENT_NEEDS_RETURN = "EVENT_NEEDS_RETURN"
+EVENT_NEEDS_RETRIEVE = "EVENT_NEEDS_RETRIEVE"
 EVENT_LOAD_OK = "EVENT_LOAD_OK"
 EVENT_UNLOAD_OK = "EVENT_UNLOAD_OK"
 EVENT_RETRIEVE_OK = "EVENT_RETRIEVE_OK"
@@ -128,13 +123,6 @@ class StateMachine(object):
         State(STATE_LOAD_AT_LOADING, on_enter=None, on_exit=None), # TODO GUI "Continue"
         State(STATE_LOAD_PROBE, on_enter=['probe'], on_exit=None),
         State(STATE_LOAD_RETRACT, on_enter=['move_retract'], on_exit=None),
-        State(STATE_LOAD_MOVE_SAFE_INITIAL, on_enter=['move_safe'], on_exit=None),
-        State(STATE_LOAD_MOVE_CLEARANCE, on_enter=['move_pocket_above_clearance'], on_exit=None),
-        State(STATE_LOAD_MOVE_CLOSE, on_enter=['move_pocket_above_close'], on_exit=None),
-        State(STATE_LOAD_MOVE_POCKET, on_enter=['open_chuck', 'move_pocket'], on_exit=None),
-        State(STATE_LOAD_LOITER_POCKET, on_enter=['loiter'], on_exit=None),
-        State(STATE_LOAD_MOVE_SIDE, on_enter=['close_chuck', 'move_pocket_side'], on_exit=None),
-        State(STATE_LOAD_MOVE_SAFE_FINAL, on_enter=['move_safe'], on_exit=None),
 
         State(STATE_UNLOAD_INIT, on_enter=['decide_unload'], on_exit=None),
         State(STATE_UNLOAD_MOVE_LOADING, on_enter=['move_loading'], on_exit=None),
@@ -160,7 +148,8 @@ class StateMachine(object):
         State(STATE_RETRIEVE_MOVE_POCKET, on_enter=['open_chuck', 'move_pocket'], on_exit=None),
         State(STATE_RETRIEVE_LOITER_POCKET, on_enter=['loiter'], on_exit=None),
         State(STATE_RETRIEVE_MOVE_SIDE, on_enter=['close_chuck', 'move_pocket_side'], on_exit=None),
-        State(STATE_RETRIEVE_MOVE_SAFE_FINAL, on_enter=['move_safe'], on_exit=None)
+        State(STATE_RETRIEVE_MOVE_SAFE_FINAL, on_enter=['move_safe'], on_exit=None),
+        State(STATE_RETRIEVE_FINAL, on_enter=['decide_after_retrieve'], on_exit=None)
     ]
 
     current_tool_number = -1 # Derived from linuxcnc status TODO what is "no tool"?
@@ -181,22 +170,17 @@ class StateMachine(object):
         # Load and Probe
         {'trigger': EVENT_REQUEST_LOAD, 'source': STATE_IDLE, 'dest': STATE_LOAD_INIT},
         {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_LOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
+        {'trigger': EVENT_NEEDS_RETRIEVE, 'source': STATE_LOAD_INIT, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
         {'trigger': EVENT_LOAD_OK, 'source': STATE_LOAD_INIT, 'dest': STATE_LOAD_MOVE_LOADING},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_LOADING, 'dest': STATE_LOAD_AT_LOADING},
         {'trigger': EVENT_REQUEST_CONTINUE, 'source': STATE_LOAD_AT_LOADING, 'dest': STATE_LOAD_PROBE},
         {'trigger': EVENT_PROBE_TOUCHED, 'source': STATE_LOAD_PROBE, 'dest': STATE_LOAD_RETRACT},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_RETRACT, 'dest': STATE_LOAD_MOVE_SAFE_INITIAL},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_SAFE_INITIAL, 'dest': STATE_LOAD_MOVE_CLEARANCE},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_CLEARANCE, 'dest': STATE_LOAD_MOVE_CLOSE},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_CLOSE, 'dest': STATE_LOAD_MOVE_POCKET},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_POCKET, 'dest': STATE_LOAD_LOITER_POCKET},
-        {'trigger': EVENT_LOITER_COMPLETE, 'source': STATE_LOAD_LOITER_POCKET, 'dest': STATE_LOAD_MOVE_SIDE},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_SIDE, 'dest': STATE_LOAD_MOVE_SAFE_FINAL},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_SAFE_FINAL, 'dest': STATE_IDLE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_RETRACT, 'dest': STATE_RETURN_MOVE_SAFE_INITIAL},
 
         # Unload
         {'trigger': EVENT_REQUEST_UNLOAD, 'source': STATE_IDLE, 'dest': STATE_UNLOAD_INIT},
         {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_UNLOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
+        {'trigger': EVENT_NEEDS_RETRIEVE, 'source': STATE_UNLOAD_INIT, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
         {'trigger': EVENT_UNLOAD_OK, 'source': STATE_UNLOAD_INIT, 'dest': STATE_UNLOAD_MOVE_LOADING},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_UNLOAD_MOVE_LOADING, 'dest': STATE_UNLOAD_AT_LOADING},
         {'trigger': EVENT_REQUEST_CONTINUE, 'source': STATE_UNLOAD_AT_LOADING, 'dest': STATE_UNLOAD_MOVE_SAFE},
@@ -215,8 +199,9 @@ class StateMachine(object):
         {'trigger': EVENT_LOITER_COMPLETE, 'source': STATE_RETURN_LOITER_POCKET, 'dest': STATE_RETURN_MOVE_SIDE},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_SIDE, 'dest': STATE_RETURN_FINAL},
         {'trigger': EVENT_CONTINUE_ATC, 'source': STATE_RETURN_FINAL, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
-        {'trigger': EVENT_CONTINUE_UNLOAD, 'source': STATE_RETURN_FINAL, 'dest': STATE_UNLOAD_MOVE_LOADING},
-        {'trigger': EVENT_CONTINUE_LOAD, 'source': STATE_RETURN_FINAL, 'dest': STATE_LOAD_MOVE_LOADING},
+        {'trigger': EVENT_LOAD_COMPLETE, 'source': STATE_RETURN_FINAL, 'dest': STATE_IDLE},
+        {'trigger': EVENT_CONTINUE_UNLOAD, 'source': STATE_RETURN_FINAL, 'dest': STATE_UNLOAD_INIT},
+        {'trigger': EVENT_CONTINUE_LOAD, 'source': STATE_RETURN_FINAL, 'dest': STATE_LOAD_INIT},
 
         # ATC Retrieval
         {'trigger': EVENT_RETRIEVE_OK, 'source': STATE_ATC_INIT, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
@@ -227,7 +212,10 @@ class StateMachine(object):
         {'trigger': EVENT_LOITER_COMPLETE, 'source': STATE_RETRIEVE_LOITER_POCKET, 'dest': STATE_RETRIEVE_MOVE_CLOSE},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_CLOSE, 'dest': STATE_RETRIEVE_MOVE_CLEARANCE},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_CLEARANCE, 'dest': STATE_RETRIEVE_MOVE_SAFE_FINAL},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_SAFE_FINAL, 'dest': STATE_IDLE},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETRIEVE_MOVE_SAFE_FINAL, 'dest': STATE_RETRIEVE_FINAL},
+        {'trigger': EVENT_ATC_COMPLETE, 'source': STATE_RETRIEVE_FINAL, 'dest': STATE_IDLE},
+        {'trigger': EVENT_CONTINUE_UNLOAD, 'source': STATE_RETRIEVE_FINAL, 'dest': STATE_UNLOAD_INIT},
+        {'trigger': EVENT_CONTINUE_LOAD, 'source': STATE_RETRIEVE_FINAL, 'dest': STATE_LOAD_INIT},
     ]
 
     def __init__(self):
@@ -246,16 +234,20 @@ class StateMachine(object):
         self.close_chuck()
 
     def decide_load(self):
-        # TODO clause
+        # TODO clauses
         if True:
             self.machine.dispatch(EVENT_LOAD_OK)
+        elif True:
+            self.machine.dispatch(EVENT_NEEDS_RETRIEVE)
         else:
             self.machine.dispatch(EVENT_NEEDS_RETURN)
 
     def decide_unload(self):
-        # TODO clause
+        # TODO clauses
         if True:
             self.machine.dispatch(EVENT_UNLOAD_OK)
+        elif True:
+            self.machine.dispatch(EVENT_NEEDS_RETRIEVE)
         else:
             self.machine.dispatch(EVENT_NEEDS_RETURN)
 
@@ -270,6 +262,17 @@ class StateMachine(object):
         # TODO clauses
         if True:
             self.machine.dispatch(EVENT_CONTINUE_ATC)
+        elif True:
+            self.machine.dispatch(EVENT_LOAD_COMPLETE)
+        elif True:
+            self.machine.dispatch(EVENT_CONTINUE_LOAD)
+        else:
+            self.machine.dispatch(EVENT_CONTINUE_UNLOAD)
+
+    def decide_after_retrieve(self):
+        # TODO clauses
+        if True:
+            self.machine.dispatch(EVENT_ATC_COMPLETE)
         elif True:
             self.machine.dispatch(EVENT_CONTINUE_LOAD)
         else:
