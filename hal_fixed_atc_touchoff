@@ -116,14 +116,14 @@ class StateMachine(object):
     """Finite state machine for ATC and touchoff"""
 
     states = [
-        State(STATE_WAITING, on_enter=['reset'], on_exit=None),
-        State(STATE_IDLE, on_enter=['reset'], on_exit=None),
+        State(STATE_WAITING, on_enter=['reset', 'restore_modal_state'], on_exit=None),
+        State(STATE_IDLE, on_enter=['reset', 'restore_modal_state'], on_exit=['save_modal_state']),
 
         State(STATE_LOAD_INIT, on_enter=['at_load_init'], on_exit=None),
         State(STATE_LOAD_MOVE_LOADING, on_enter=['move_loading'], on_exit=None),
         State(STATE_LOAD_AT_LOADING, on_enter=['open_continue_window'], on_exit=None),
         State(STATE_LOAD_TOUCHOFF, on_enter=['assume_loaded', 'touchoff'], on_exit=None),
-        State(STATE_LOAD_RETRACT, on_enter=['move_retract'], on_exit=None),
+        State(STATE_LOAD_RETRACT, on_enter=['update_current_tool_length_offset', 'move_retract'], on_exit=None),
 
         State(STATE_UNLOAD_INIT, on_enter=['at_unload_init'], on_exit=None),
         State(STATE_UNLOAD_MOVE_LOADING, on_enter=['move_loading'], on_exit=None),
@@ -220,6 +220,8 @@ class StateMachine(object):
     tool_table = [] # List of tuples TODO is it a list or tuple?
     actual_position = {'x': 0, 'y': 0, 'z': 0} # coord map
     is_ok_for_mdi = False # Boolean
+    is_spindle_on = False # Boolean
+    is_modal_state_saved = False # Boolean
     # HAL I/O:
     is_touching = False # Pin input
     is_chuck_open = False # Pin output
@@ -239,7 +241,6 @@ class StateMachine(object):
         self.tool_linuxcnc = None
         self.tool_changing = None
         self.tool_loadunload = None
-        # (don't change self.tool_actual)
         self.loadunload_mode = None
         self.is_touching = False
         self.close_chuck()
@@ -344,11 +345,27 @@ class StateMachine(object):
         else:
             self.machine.dispatch(EVENT_REQUEST_CANCEL)
 
+    def save_modal_state(self):
+        self.is_modal_state_saved = True
+        send_gcode('M70')
+
+    def restore_modal_state(self):
+        """M72 restore modal state (if saved), and [effectful] G43 tool length compensation"""
+        if self.is_modal_state_saved:
+            send_gcode('M72')
+            self.is_modal_state_saved = False
+
+            # G43 (tool length compensation) if a tool is currently loaded
+            if self.tool_actual:
+                send_gcode('G43 H{}'.format(self.tool_actual))
+
     def request_load_tool(self, tool):
-        pass # TODO
+        self.tool_loadunload = tool
+        self.machine.dispatch(EVENT_REQUEST_LOAD)
 
     def request_unload_tool(self, tool):
-        pass # TODO
+        self.tool_loadunload = tool
+        self.machine.dispatch(EVENT_REQUEST_UNLOAD)
 
     def set_tool_change(self, is_tool_change, number, changed):
         # Derive
@@ -377,6 +394,10 @@ class StateMachine(object):
     def set_tool_table(self, tool_table):
         self.tool_table = tool_table
 
+    def update_current_tool_length_offset(self):
+        length_offset = self.actual_position.z + config.touchoff_length_compensation_offset
+        send_gcode("G10 L1 P{} Z{}".format(self.tool_actual, length_offset))
+
     def set_actual_position(self, actual_position):
         self.actual_position = actual_position
 
@@ -390,6 +411,9 @@ class StateMachine(object):
             else:
                 print "ERROR: Not ready for MDI"
                 self.machine.dispatch(EVENT_NOT_READY)
+
+    def set_is_spindle_on(self, is_spindle_on):
+        self.is_spindle_on = is_spindle_on
 
     def open_chuck(self):
         self.is_chuck_open = True
@@ -525,11 +549,7 @@ def status_routine(state, status):
     state.set_actual_position({'x': ap[0], 'y': ap[1], 'z': ap[2]})
     state.set_is_ok_for_mdi(not status.estop and status.enabled and status.homed and (
         status.interp_state == linuxcnc.INTERP_IDLE))
-    # state.set_task_mode(status.task_mode) # mdi, auto, manual
-    # state.set_is_in_position(status.inpos != 0)
-    # state.set_spindle_enabled(status.spindle_enabled)
-    # state.set_spindle_speed(status.spindle_speed)
-    # state.set_file(status.file)
+    state.set_is_spindle_on(status.spindle_speed == 0)
 
 def hal_routine(state):
     """HAL routine (for main loop)"""
@@ -554,7 +574,7 @@ def gui_routine(state):
         except ValueError:
             print 'Bad input'
 
-        if i is not None and i >= 0:
+        if i is not None and i > 0:
             state.request_load_tool(i)
     elif event == 'Unload':
         try:
@@ -562,7 +582,7 @@ def gui_routine(state):
         except ValueError:
             print 'Bad input'
 
-        if i is not None and i >= 0:
+        if i is not None and i > 0:
             state.request_unload_tool(i)
 
 # Initialize state machine
