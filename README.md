@@ -24,7 +24,12 @@ Made for the Gerber CNC wood router at Makehaven (makerspace in New Haven, CT).
 
 ```
 loadusr -W hal_fixed_atc_touchoff
-TODO pins
+net tool-change-request     iocontrol.0.tool-change       =>  hal_fixed_atc_touchoff.change
+net tool-change-confirmed   iocontrol.0.tool-changed      <=  hal_fixed_atc_touchoff.changed
+net tool-number             iocontrol.0.tool-prep-number  =>  hal_fixed_atc_touchoff.number
+# net tool-prepare-loopback   iocontrol.0.tool-prepare      =>  iocontrol.0.tool-prepared
+
+
 ```
 
 ## Notes

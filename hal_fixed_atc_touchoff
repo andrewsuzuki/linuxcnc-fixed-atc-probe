@@ -61,6 +61,8 @@ EVENT_FLUSH_COMPLETE = "EVENT_FLUSH_COMPLETE"
 EVENT_CONTINUE_ATC = "EVENT_CONTINUE_ATC"
 EVENT_CONTINUE_UNLOAD = "EVENT_CONTINUE_UNLOAD"
 EVENT_CONTINUE_LOAD = "EVENT_CONTINUE_LOAD"
+EVENT_LOAD_COMPLETE = "EVENT_LOAD_COMPLETE"
+EVENT_ATC_COMPLETE = "EVENT_ATC_COMPLETE"
 
 def panic():
     """Panic by logging fatal error and exiting"""
@@ -116,7 +118,7 @@ class StateMachine(object):
     """Finite state machine for ATC and touchoff"""
 
     states = [
-        State(STATE_WAITING, on_enter=['reset', 'restore_modal_state'], on_exit=None),
+        State(STATE_WAITING, on_enter=['reset'], on_exit=None),
         State(STATE_IDLE, on_enter=['reset', 'restore_modal_state'], on_exit=['save_modal_state']),
 
         State(STATE_LOAD_INIT, on_enter=['at_load_init'], on_exit=None),
@@ -161,18 +163,18 @@ class StateMachine(object):
 
         # Load and Touchoff
         {'trigger': EVENT_REQUEST_LOAD, 'source': STATE_IDLE, 'dest': STATE_LOAD_INIT},
-        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_LOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
+        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_LOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE_INITIAL},
         {'trigger': EVENT_NEEDS_RETRIEVE, 'source': STATE_LOAD_INIT, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
         {'trigger': EVENT_LOAD_OK, 'source': STATE_LOAD_INIT, 'dest': STATE_LOAD_MOVE_LOADING},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_MOVE_LOADING, 'dest': STATE_LOAD_AT_LOADING},
         {'trigger': EVENT_REQUEST_CONTINUE, 'source': STATE_LOAD_AT_LOADING, 'dest': STATE_LOAD_TOUCHOFF},
         {'trigger': EVENT_REQUEST_CANCEL, 'source': STATE_LOAD_AT_LOADING, 'dest': STATE_IDLE},
         {'trigger': EVENT_TOUCHOFF_TOUCHED, 'source': STATE_LOAD_TOUCHOFF, 'dest': STATE_LOAD_RETRACT},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_RETRACT, 'dest': STATE_RETURN_MOVE_SAFE_INITIAL},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_LOAD_RETRACT, 'dest': STATE_RETURN_MOVE_SAFE_FINAL},
 
         # Unload
         {'trigger': EVENT_REQUEST_UNLOAD, 'source': STATE_IDLE, 'dest': STATE_UNLOAD_INIT},
-        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_UNLOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
+        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_UNLOAD_INIT, 'dest': STATE_RETURN_MOVE_SAFE_INITIAL},
         {'trigger': EVENT_NEEDS_RETRIEVE, 'source': STATE_UNLOAD_INIT, 'dest': STATE_RETRIEVE_MOVE_SAFE_INITIAL},
         {'trigger': EVENT_UNLOAD_OK, 'source': STATE_UNLOAD_INIT, 'dest': STATE_UNLOAD_MOVE_LOADING},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_UNLOAD_MOVE_LOADING, 'dest': STATE_UNLOAD_AT_LOADING},
@@ -184,8 +186,8 @@ class StateMachine(object):
         {'trigger': EVENT_REQUEST_ATC, 'source': STATE_IDLE, 'dest': STATE_ATC_INIT},
 
         # ATC Return
-        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_ATC_INIT, 'dest': STATE_RETURN_MOVE_SAFE},
-        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_SAFE, 'dest': STATE_RETURN_MOVE_CLEARANCE},
+        {'trigger': EVENT_NEEDS_RETURN, 'source': STATE_ATC_INIT, 'dest': STATE_RETURN_MOVE_SAFE_INITIAL},
+        {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_SAFE_INITIAL, 'dest': STATE_RETURN_MOVE_CLEARANCE},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_CLEARANCE, 'dest': STATE_RETURN_MOVE_CLOSE},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_CLOSE, 'dest': STATE_RETURN_MOVE_POCKET},
         {'trigger': EVENT_IN_POSITION, 'source': STATE_RETURN_MOVE_POCKET, 'dest': STATE_RETURN_LOITER_POCKET},
@@ -374,9 +376,9 @@ class StateMachine(object):
             tool_changing = number
 
         # If changed...
-        if tool_changing != self.tool_changing
+        if tool_changing != self.tool_changing:
             self.tool_changing = tool_changing
-            if self.tool_changing
+            if self.tool_changing:
                 self.machine.dispatch(EVENT_REQUEST_ATC)
             else:
                 pass
@@ -471,7 +473,7 @@ class StateMachine(object):
                     print "ERROR: Too low! Stopping before crash, if it hasn't already happened."
                     panic()
                 # break if touching, or already touched
-                if self.machine.state != STATE_LOAD_TOUCHOFF or self.is_touching
+                if self.machine.state != STATE_LOAD_TOUCHOFF or self.is_touching:
                     break
                 self.move_coord_relative(coord)
         t = threading.Thread(target=touchoff_loop)
