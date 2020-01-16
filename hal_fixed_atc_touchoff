@@ -545,13 +545,13 @@ def status_routine(state, status):
         panic()
 
     # Read status into state
-    state.set_tool_linuxcnc(None if status.tool_in_spindle == -1 else status.tool_in_spindle) # TODO what is "no tool"? -1?
+    state.set_tool_linuxcnc(None if status.tool_in_spindle < 1 else status.tool_in_spindle)
     state.set_tool_table(status.tool_table)
     ap = status.actual_position
     state.set_actual_position({'x': ap[0], 'y': ap[1], 'z': ap[2]})
     state.set_is_ok_for_mdi(not status.estop and status.enabled and status.homed and (
         status.interp_state == linuxcnc.INTERP_IDLE))
-    state.set_is_spindle_on(status.spindle_speed == 0)
+    state.set_is_spindle_on(status.spindle_enabled or status.spindle_speed != 0)
 
 def hal_routine(state):
     """HAL routine (for main loop)"""
